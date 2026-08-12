@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排班與人力控管系統 - 完整修正版</title>
+
+    <!-- 載入 html2canvas 套件 (用於一鍵班表截圖) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root {
+            --primary-bg: #f4f6f9; --header-bg: #343a40; --excel-green: #217346;
+            --tab-active: #ffffff; --tab-inactive: #e9ecef;
+            --sat-color: #bbdefb; --sun-color: #ffcdd2;
+            --date-bg: #fff176;
+            --week-bg: #c8e6c9;
+            --stat-bg: #fffde7;
+            --remark-height: 24px;
+        }
+        body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 12px; margin: 0; background-color: var(--primary-bg); color: #333; }
+        .top-navbar { background-color: var(--header-bg); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .tab-bar { display: flex; background-color: #dcdcdc; padding: 5px 10px 0; border-bottom: 2px solid #ccc; }
+        .tab-item { padding: 8px 16px; margin-right: 4px; background-color: var(--tab-inactive); border: 1px solid #ccc; border-bottom: none; border-radius: 4px 4px 0 0; cursor: pointer; font-weight: bold; color: #495057; }
+        .tab-item.active { background-color: var(--tab-active); border-top: 3px solid var(--excel-green); color: #000; border-bottom: 2px solid #fff; margin-bottom: -2px; }
+        .content-container { padding: 10px; background-color: #fff; min-height: calc(100vh - 120px); }
+        .tab-page { display: none; }
+        .tab-page.active { display: block; }
+        
+        #scheduleScaler { 
+            transform-origin: top left; 
+            display: inline-block;
+            width: 100%; 
+            transition: transform 0.2s ease; 
+        }
+        
+        table { 
+            border-collapse: collapse; 
+            width: 100% !important;
+            text-align: center; 
+            white-space: nowrap; 
+            table-layout: auto; 
+        }
+        th, td { border: 1px solid #ced4da; padding: 2px 1px; box-sizing: border-box; }
+        th { font-weight: 600; }
+        
+        .day-col { 
+            width: auto !important; 
+            min-width: 18px !important;
+            padding: 1px 0 !important;
+        }
+        .name-col { min-width: 90px !important; width: 105px !important; }
+        .stat-col { min-width: 28px !important; width: 30px !important; max-width: 35px !important; font-size: 11px; line-height: 1.1; padding: 1px 0 !important; }
+
+        .text-danger, .text-success {
+            font-weight: normal !important;
+            font-size: 10px !important;
+            letter-spacing: -0.5px;
+        }
+
+        .alert-row td {
+            line-height: 1.15 !important;
+            padding: 2px 0 !important;
+        }
+
+        .header-date-row th { background-color: var(--date-bg) !important; color: #333; }
+        .header-week-row th { background-color: var(--week-bg) !important; color: #1b5e20; }
+        .day-sat { background-color: var(--sat-color) !important; color: #0d47a1 !important; }
+        .day-sun { background-color: var(--sun-color) !important; color: #b71c1c !important; }
+        
+        input.cell-input { width: 100%; border: none; text-align: center; font-size: 12px; background: transparent; padding: 1px 0; font-weight: bold; cursor: text; }
+        input.cell-input:focus { background-color: rgba(255, 255, 255, 0.9); outline: 2px solid #2196f3; }
+        
+        input.remark-input { width: 100%; height: var(--remark-height); border: none; text-align: center; font-size: 11px; color: #555; background: transparent; padding: 0; }
+        input.remark-input:focus { background-color: #e3f2fd; outline: 1px solid #2196f3; }
+        
+        select.edit-input, input.edit-input { border: 1px solid #ccc; padding: 3px; border-radius: 3px; font-size: 12px; }
+        input[type="color"] { border: none; width: 32px; height: 26px; padding: 0; cursor: pointer; border-radius: 3px; }
+        
+        .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 5px; font-size: 12px; }
+        .btn-success { background-color: #198754; color: white; }
+        .btn-primary { background-color: #0d6efd; color: white; }
+        .btn-warning { background-color: #ffc107; color: #000; }
+        .btn-line { background-color: #06C755; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; padding: 3px 6px; font-size: 11px;}
+        
+        .card { border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin-bottom: 12px; background: #fafafa; }
+        .text-danger { color: #dc3545; }
+        .text-success { color: #198754; }
+        .text-warning { color: #d39e00; font-weight: bold; }
+
+        .quick-ref-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; padding: 6px 12px; margin-bottom: 10px; }
+        .ref-btn { display: inline-block; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #ccc; font-size: 11px; font-weight: bold; user-select: none; }
+        
+        #loadingOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5); z-index: 9999; justify-content: center; align-items: center;
+            color: white; flex-direction: column; font-size: 15px; font-weight: bold;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #217346; border-radius: 50%;
+            width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 12px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #toast { visibility: hidden; min-width: 180px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 8px; position: fixed; z-index: 10000; left: 50%; bottom: 25px; transform: translateX(-50%); font-size: 13px; }
+        #toast.show { visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.2s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 25px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 25px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div id="loadingText">資料處理中，請稍候...</div>
+    </div>
+
+    <div class="top-navbar">
+        <h2 style="margin: 0; font-size: 18px;">排班與人力控管系統</h2>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-weight:bold;">套用門市:</label>
+            <select id="globalStore" class="edit-input" style="width:130px; font-weight:bold; color:#0070c0;" onchange="loadFromCloud()">
+                <option value="南崁中正">載入中...</option>
+            </select>
+            <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
+            <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
+            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Sheet</button>
+            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰 Excel</button>
+            <button class="btn btn-line" onclick="captureAndCopyForLine()">📸 截圖傳送到 LINE</button>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item active" onclick="switchTab('tab-schedule', this)">班表</div>
+        <div class="tab-item" onclick="switchTab('tab-shifts', this)">班別資料(對照表)</div>
+        <div class="tab-item" onclick="switchTab('tab-manpower', this)">人數控管</div>
+        <div class="tab-item" onclick="switchTab('tab-staff', this)">人員設定</div>
+        <div class="tab-item" onclick="switchTab('tab-deform', this)">四週週期/變形工時</div>
+    </div>
+
+    <div class="content-container">
+        <div id="tab-schedule" class="tab-page active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label><strong>選擇年月：</strong></label>
+                    <input type="month" id="schedule-month" class="edit-input" onchange="renderSchedule()">
+                    <button class="btn btn-warning" onclick="validateDeformRules()">依區間檢核工時</button>
+                    
+                    <label style="margin-left:10px;"><strong>畫面縮放：</strong></label>
+                    <select id="zoomSelect" class="edit-input" onchange="changeZoom(this.value)">
+                        <option value="1">100% (預設)</option>
+                        <option value="0.9">90%</option>
+                        <option value="0.8">80%</option>
+                        <option value="1.1">110%</option>
+                    </select>
+
+                    <label style="margin-left:10px;"><strong>備註欄高：</strong></label>
+                    <select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
+                        <option value="24px" selected>雙倍 (預設)</option>
+                        <option value="16px">單列 (緊湊)</option>
+                        <option value="36px">三倍 (高)</option>
+                    </select>
+                </div>
+
+                <div class="col-toggle-bar" style="background:#eef2f5; padding: 4px 8px; border-radius:4px; font-size:11px;">
+                    <strong style="margin-right:4px;">顯示控制：</strong>
+                    <label><input type="checkbox" id="showColAlert" checked onchange="toggleColumns()"> 人力提示</label> | 
+                    <label><input type="checkbox" id="showColReal" checked onchange="toggleColumns()"> 實休</label>
+                    <label><input type="checkbox" id="showColTarget" checked onchange="toggleColumns()"> 帳休</label>
+                    <label><input type="checkbox" id="showColAL" checked onchange="toggleColumns()"> 特休</label>
+                    <label><input type="checkbox" id="showColOT" checked onchange="toggleColumns()"> 加班</label>
+                    <label><input type="checkbox" id="showColRemAL" checked onchange="toggleColumns()"> 剩餘特休</label>
+                </div>
+            </div>
+            
+            <div class="quick-ref-bar" id="quickRefContainer"></div>
+            
+            <div style="overflow-x: auto;">
+                <div id="scheduleScaler">
+                    <table id="scheduleTable">
+                        <thead id="scheduleHead"></thead>
+                        <tbody id="scheduleBody"></tbody>
+                        <tfoot id="scheduleFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 班別對照表 -->
+        <div id="tab-shifts" class="tab-page">
+            <h3>班別與飛騰系統代碼對照表</h3>
+            <p style="color:#d32f2f;">💡 <strong>提示 (如 B特、B補)：</strong>若該假別請假期間不計入人力，請將【涵蓋時段】<strong>留空</strong>，並設定對應特休/補休時數。</p>
+            <div class="card">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr><th>名稱</th><th>畫面簡寫</th><th>職位</th><th>飛騰代碼</th><th>文字色</th><th>背景色</th><th>涵蓋時段</th><th>加班(增)</th><th>特休(扣)</th><th>補休(扣)</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="shiftCodesBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td><input type="text" id="newShiftName" class="edit-input" style="width:90%" placeholder="名稱"></td>
+                            <td><input type="text" id="newShiftKey" class="edit-input" style="width:90%" placeholder="簡寫"></td>
+                            <td><input type="text" id="newShiftPos" class="edit-input" style="width:90%" value="通用"></td>
+                            <td><input type="text" id="newShiftCode" class="edit-input" style="width:90%" placeholder="代碼"></td>
+                            <td><input type="color" id="newTextColor" value="#ffffff"></td>
+                            <td><input type="color" id="newBgColor" value="#2196f3"></td>
+                            <td><input type="text" id="newShiftCover" class="edit-input" style="width:80px" placeholder="A,B,C"></td>
+                            <td><input type="number" id="newShiftOT" class="edit-input" style="width:40px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newShiftAL" class="edit-input" style="width:40px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newShiftCL" class="edit-input" style="width:40px" step="0.5" value="0"></td>
+                            <td><button class="btn btn-primary" onclick="addShiftCode()">新增</button></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- 3. 人數控管 -->
+        <div id="tab-manpower" class="tab-page">
+            <h3>每日人力最低需求設定</h3>
+            <div class="card">
+                <table style="width: 600px;">
+                    <thead>
+                        <tr><th>時段代碼</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="manpowerBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td><input type="text" id="newMpClass" class="edit-input" style="width:70px" placeholder="如: A"></td>
+                            <td><input type="number" id="newMp1" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp2" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp3" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp4" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp5" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp6" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp7" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><button class="btn btn-primary" onclick="addManpower()">新增</button></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. 人員設定 -->
+        <div id="tab-staff" class="tab-page">
+            <h3>員工名冊與時數餘額統計</h3>
+            <div class="card">
+                <table style="width: 100%;">
+                    <thead><tr><th>員工編號</th><th>姓名</th><th>職位</th><th>組別</th><th>特休剩餘(H)</th><th>補休剩餘(H)</th><th>加班累計(H)</th><th>操作</th></tr></thead>
+                    <tbody id="staffBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td><input type="text" id="newStaffId" class="edit-input" style="width:90%" placeholder="編號"></td>
+                            <td><input type="text" id="newStaffName" class="edit-input" style="width:90%" placeholder="姓名"></td>
+                            <td><input type="text" id="newStaffPos" class="edit-input" style="width:90%" placeholder="職位"></td>
+                            <td><input type="text" id="newStaffGroup" class="edit-input" style="width:90%" placeholder="組別"></td>
+                            <td><input type="number" id="newStaffAL" class="edit-input" style="width:60px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newStaffCL" class="edit-input" style="width:60px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newStaffOT" class="edit-input" style="width:60px" step="0.5" value="0"></td>
+                            <td><button class="btn btn-primary" onclick="addStaff()">新增</button></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- 5. 四週變形工時 -->
+        <div id="tab-deform" class="tab-page">
+            <h3>四週變形工時區間與例休需求設定</h3>
+            <div style="margin-bottom: 10px;">
+                <label><strong>選擇年月：</strong></label>
+                <select id="deformYear" class="edit-input" onchange="renderIntervals()">
+                    <!-- 選項將由 JavaScript 動態生成 (包含今年與明後年) -->
+                </select>
+                <select id="deformMonth" class="edit-input" onchange="renderIntervals()">
+                    <option value="01">1 月</option>
+                    <option value="02">2 月</option>
+                    <option value="03">3 月</option>
+                    <option value="04">4 月</option>
+                    <option value="05">5 月</option>
+                    <option value="06">6 月</option>
+                    <option value="07">7 月</option>
+                    <option value="08" selected>8 月</option>
+                    <option value="09">9 月</option>
+                    <option value="10">10 月</option>
+                    <option value="11">11 月</option>
+                    <option value="12">12 月</option>
+                </select>
+            </div>
+            <div class="card">
+                <table style="width: 900px;">
+                    <thead>
+                        <tr><th>區間名稱</th><th>開始日期(1~31)</th><th>結束日期</th><th>應有【例】假數</th><th>應有【休】假數</th><th>應有【國】假數</th><th>操作</th></tr>
+                    </thead>
+                    <tbody id="intervalsBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td><input type="text" id="newIntName" class="edit-input" style="width:90%" placeholder="例: 前兩週"></td>
+                            <td><input type="number" id="newIntStart" class="edit-input" style="width:90%" placeholder="1"></td>
+                            <td><input type="number" id="newIntEnd" class="edit-input" style="width:90%" placeholder="14"></td>
+                            <td><input type="number" id="newIntLei" class="edit-input" style="width:90%" placeholder="2"></td>
+                            <td><input type="number" id="newIntXiu" class="edit-input" style="width:90%" placeholder="2"></td>
+                            <td><input type="number" id="newIntGuo" class="edit-input" style="width:90%" placeholder="1"></td>
+                            <td><button class="btn btn-primary" onclick="addInterval()">新增區間</button></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast">訊息提示</div>
+
+    <script>
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwZODHweWlDZyShmq17anE6UdoZU2wZMpgVZQVjksZBIUqD7U9n5cUKEIDSaxIL7oYdTg/exec";
+
+        let state = { stores: [], staff: [], shiftMap: [], manpower: [], intervals: {}, dailyNotes: {} };
+        const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+        function switchTab(tabId, element) {
+    document.querySelectorAll('.tab-page').forEach(page => page.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    element.classList.add('active');
+
+    // 💡 點切換頁籤時：先將「選擇年月」強制同步給變形工時選單，再進行表格繪製
+    if (tabId === 'tab-deform') {
+        syncDeformMonthWithSchedule();
+        renderIntervals();
+    }
+}
+
+        function showLoading(msg = "資料處理中，請稍候...") {
+            document.getElementById('loadingText').innerText = msg;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+        function showToast(text) {
+            const toast = document.getElementById("toast"); toast.innerText = text;
+            toast.className = "show"; setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 1500);
+        }
+        function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => { showToast(`已複製： ${text}`); }); }
+        function toggleColumns() { renderSchedule(); }
+        function changeZoom(val) { document.getElementById('scheduleScaler').style.transform = `scale(${val})`; }
+        function changeRemarkHeight(val) { document.documentElement.style.setProperty('--remark-height', val); }
+
+        function setDefaultComputerMonth() {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            
+            // 1. 設定班表年月為當下年月
+            document.getElementById('schedule-month').value = `${yyyy}-${mm}`;
+            
+            // 2. 動態產生變形工時的年份選單 (前一年 ~ 後兩年)，解決無法選擇下一年度的問題
+            const yearSelect = document.getElementById('deformYear');
+            yearSelect.innerHTML = '';
+            for (let i = yyyy - 1; i <= yyyy + 2; i++) {
+                yearSelect.innerHTML += `<option value="${i}">${i} 年</option>`;
+            }
+            
+            // 3. 設定變形工時年月選單為當下年月
+            yearSelect.value = yyyy;
+            document.getElementById('deformMonth').value = mm;
+        }
+
+        function syncDeformMonthWithSchedule() {
+    const schedMonthVal = document.getElementById('schedule-month').value; // 例: "2026-09"
+    if (schedMonthVal) {
+        const [yyyy, mm] = schedMonthVal.split('-');
+        const formattedMM = String(mm).padStart(2, '0');
+        
+        const yearSelect = document.getElementById('deformYear');
+        const monthSelect = document.getElementById('deformMonth');
+
+        if (!Array.from(yearSelect.options).some(opt => opt.value === yyyy)) {
+            yearSelect.innerHTML += `<option value="${yyyy}">${yyyy} 年</option>`;
+        }
+        
+        yearSelect.value = yyyy;
+        monthSelect.value = formattedMM;
+    }
+}
+
+        function updateDailyNote(dateKey, val) {
+            if (!state.dailyNotes) state.dailyNotes = {};
+            state.dailyNotes[dateKey] = val;
+        }
+
+        function captureAndCopyForLine() {
+            showLoading("正在生成班表截圖...");
+            const element = document.getElementById('scheduleTable');
+            const dateVal = document.getElementById('schedule-month').value;
+
+            html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+                canvas.toBlob(blob => {
+                    try {
+                        const item = new ClipboardItem({ "image/png": blob });
+                        navigator.clipboard.write([item]).then(() => {
+                            hideLoading();
+                            alert("📸 班表截圖已複製到剪貼簿！\n請直接切換到 LINE 聊天視窗按下 Ctrl + V 貼上傳送！");
+                        }).catch(err => {
+                            hideLoading();
+                            downloadImageBlob(blob, `班表_${dateVal}.png`);
+                            alert("📸 班表截圖已下載至電腦，可直接拖入 LINE 發送！");
+                        });
+                    } catch (e) {
+                        hideLoading();
+                        downloadImageBlob(blob, `班表_${dateVal}.png`);
+                        alert("📸 班表截圖已下載，可直接發送到 LINE！");
+                    }
+                });
+            });
+        }
+
+        function downloadImageBlob(blob, filename) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        async function loadFromCloud() {
+            const storeSelect = document.getElementById('globalStore');
+            const currentStore = storeSelect.value || "";
+            const currentMonth = document.getElementById('schedule-month').value;
+
+            showLoading(`正在讀取【${currentStore || "門市"}】雲端資料...`);
+
+            try {
+                let url = `${GAS_API_URL}?storeKey=${encodeURIComponent(currentStore)}&monthKey=${encodeURIComponent(currentMonth)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                applyDataToState(data, currentStore);
+                showToast(`【${currentStore}】資料載入完成！`);
+            } catch (err) {
+                alert("讀取 Google Sheet 資料失敗：" + err);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function saveToCloud() {
+            const activeStore = document.getElementById('globalStore').value;
+            showLoading(`正在將【${activeStore}】同步寫入 Google Sheet...`);
+
+            const payload = {
+                storeKey: activeStore, 
+                staff: state.staff, 
+                shiftMap: state.shiftMap,
+                manpower: state.manpower, 
+                intervals: state.intervals, 
+                schedule: { staff: state.staff },
+                dailyNotes: state.dailyNotes
+            };
+
+            try {
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                showToast(`【${activeStore}】資料已成功寫入 Google Sheet！`);
+            } catch (err) {
+                showToast(`【${activeStore}】資料寫入完成！`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function applyDataToState(data, activeStore) {
+    const storeSelect = document.getElementById('globalStore');
+    if (data.stores && data.stores.length > 0) {
+        state.stores = data.stores;
+        state.dailyNotes = data.dailyNotes || {};
+        let selected = activeStore || data.stores[0];
+        storeSelect.innerHTML = data.stores.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+    }
+
+    state.staff = data.staff || [];
+    state.shiftMap = data.shiftMap || [];
+    state.manpower = data.manpower || [];
+    
+    // 💡 確保 intervals 正確寫入 state
+    state.intervals = data.intervals || {};
+
+    if (data.schedule) {
+        state.staff.forEach(emp => {
+            emp.shifts = (data.schedule.shifts && data.schedule.shifts[emp.id]) ? data.schedule.shifts[emp.id] : {};
+            emp.remarks = (data.schedule.remarks && data.schedule.remarks[emp.id]) ? data.schedule.remarks[emp.id] : {};
+        });
+    }
+
+    // 💡 載入資料後，依序渲染各分頁
+    renderShiftCodes(); 
+    renderStaff(); 
+    renderManpower(); 
+    
+    // 先同步年月選單，再繪製變形工時與班表
+    syncDeformMonthWithSchedule();
+    renderIntervals(); 
+    renderSchedule();
+}
+
+        function renderQuickRef() {
+            const container = document.getElementById('quickRefContainer');
+            const uniqueKeys = [];
+            const displayShifts = state.shiftMap.filter(m => {
+                if (uniqueKeys.includes(m.key)) return false;
+                uniqueKeys.push(m.key); return true;
+            });
+            container.innerHTML = `<span style="font-size: 12px; font-weight: bold; color: #555; margin-right: 5px;">快捷面板:</span>` + 
+                displayShifts.map(m => `<div class="ref-btn" style="color:${m.textColor}; background-color:${m.bgColor};" onclick="copyToClipboard('${m.key}')" title="點擊複製 ${m.key}">${m.key}</div>`).join('');
+        }
+
+        // --- 排班表動態渲染 ---
+        function renderSchedule() {
+            const dateVal = document.getElementById('schedule-month').value;
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const formattedMonthStr = `${year} / ${String(month).padStart(2, '0')}`;
+            
+            let targetLei = 0, targetXiu = 0, targetGuo = 0;
+            const currentIntervals = state.intervals[dateVal] || [];
+            currentIntervals.forEach(int => {
+                targetLei += (int.reqLei || 0);
+                targetXiu += (int.reqXiu || 0);
+                targetGuo += (int.reqGuo || 0);
+            });
+            let totalOffTarget = targetLei + targetXiu + targetGuo;
+            let targetHintStr = `[ ${targetLei}例 ${targetXiu}休 ${targetGuo}國 ]`;
+
+            const showAlert = document.getElementById('showColAlert').checked;
+            const showReal = document.getElementById('showColReal').checked;
+            const showTarget = document.getElementById('showColTarget').checked;
+            const showAL = document.getElementById('showColAL').checked;
+            const showOT = document.getElementById('showColOT').checked;
+            const showRemAL = document.getElementById('showColRemAL').checked;
+
+            let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0);
+
+            let thead = document.getElementById('scheduleHead');
+            
+            // 1. 人力提示列
+            let alertRow = '';
+            if (showAlert) {
+                alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
+                for(let i=1; i<=daysInMonth; i++) {
+                    let d = new Date(year, month-1, i).getDay();
+                    let reqIdx = (d === 0) ? 6 : d - 1; 
+                    let dailyAlerts = [];
+                    
+                    state.manpower.forEach(mp => {
+                        let req = mp.reqs[reqIdx];
+                        let currentCount = 0;
+                        state.staff.forEach(emp => {
+                            let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
+                            let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                            if (map) {
+                                let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                if (coveredSlots.includes(mp.class.toUpperCase()) || s.startsWith(mp.class)) currentCount++;
+                            }
+                        });
+                        let diff = currentCount - req;
+                        if (diff < 0) dailyAlerts.push(`<span class="text-danger">${mp.class}(${Math.abs(diff)})</span>`);
+                        if (diff > 0) dailyAlerts.push(`<span class="text-success">${mp.class}(${diff})</span>`);
+                    });
+                    alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
+                }
+                if (extraColCount > 0) {
+                    alertRow += `<td colspan="${extraColCount}" style="color:#d32f2f; font-weight:bold; font-size:11px; text-align:center; background:#fffde7;">${targetHintStr}</td>`;
+                }
+                alertRow += `</tr>`;
+            }
+
+            // 列1：提醒警語列
+            let row1 = `<tr style="background-color: #fff3cd; color: #856404; font-weight: bold; font-size: 11px;">
+                <td colspan="${1 + daysInMonth + extraColCount}" style="text-align: left; padding: 4px 8px;">
+                    ⚠️ 下班時間或休息時間到請離開工作崗位，勿未經同意自行加班
+                </td>
+            </tr>`;
+
+            // 列2：每日備註列
+            let row2 = `<tr style="background-color: #f9f9f9;">
+                <td class="name-col" style="font-size: 11px; font-weight: bold; color: #555;">備註</td>`;
+            for(let i=1; i<=daysInMonth; i++) {
+                let dateKey = `${year}-${month}-${i}`;
+                let noteVal = state.dailyNotes[dateKey] || '';
+                row2 += `<td class="day-col">
+                    <input class="remark-input" style="font-size:10px; color:#333;" value="${noteVal}" placeholder="" onchange="updateDailyNote('${dateKey}', this.value)">
+                </td>`;
+            }
+            if (extraColCount > 0) row2 += `<td colspan="${extraColCount}"></td>`;
+            row2 += `</tr>`;
+
+            // 日期列與星期列
+            let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000;">${formattedMonthStr}</th>`;
+            let dayRow = `<tr class="header-week-row">`;
+            for(let i=1; i<=daysInMonth; i++) {
+                let d = new Date(year, month-1, i).getDay();
+                let dayClass = (d === 0) ? 'day-sun' : (d === 6) ? 'day-sat' : '';
+                dateRow += `<th class="day-col ${dayClass}">${i}</th>`;
+                dayRow += `<th class="day-col ${dayClass}">${weekDays[d]}</th>`;
+            }
+
+            if (showReal) dateRow += `<th rowspan="2" class="stat-col">實休</th>`;
+            if (showTarget) dateRow += `<th rowspan="2" class="stat-col">帳休</th>`;
+            if (showAL) dateRow += `<th rowspan="2" class="stat-col">特休</th>`;
+            if (showOT) dateRow += `<th rowspan="2" class="stat-col">加班</th>`;
+            if (showRemAL) dateRow += `<th rowspan="2" class="stat-col">剩餘<br>特休</th>`;
+
+            dateRow += `</tr>`;
+            dayRow += `</tr>`;
+            thead.innerHTML = alertRow + row1 + row2 + dateRow + dayRow;
+
+            let tbody = document.getElementById('scheduleBody');
+            tbody.innerHTML = '';
+            
+            state.staff.forEach((emp, empIdx) => {
+                let realOff = 0, usedAL = 0, earnedOT = 0;
+                
+                let nameCellHtml = `<strong>${emp.name}</strong><br><span style="font-size:10px; color:#666; font-weight:normal;">${emp.group} | ${emp.pos}</span>`;
+
+                let shiftRow = `<tr>
+                    <td rowspan="2" class="name-col" style="background:#fff; line-height:1.2; padding:2px;">${nameCellHtml}</td>`;
+                
+                let remarkRow = `<tr>`;
+
+                for(let i=1; i<=daysInMonth; i++) {
+                    let dateKey = `${year}-${month}-${i}`;
+                    let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
+                    let r = (emp.remarks && emp.remarks[dateKey]) ? emp.remarks[dateKey] : '';
+                    if (['休', '例', '國'].includes(s)) realOff++;
+
+                    let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                    let styleStr = map ? `color:${map.textColor}; background-color:${map.bgColor};` : '';
+                    
+                    if (map) {
+                        usedAL += (Number(map.al) || 0);
+                        earnedOT += (Number(map.ot) || 0);
+                    }
+
+                    shiftRow += `<td class="day-col" style="${styleStr}">
+                        <input class="cell-input" style="${styleStr}" value="${s}" onchange="updateShift(${empIdx}, '${dateKey}', this.value)">
+                    </td>`;
+
+                    remarkRow += `<td class="day-col" style="background:#f9f9f9;">
+                        <input class="remark-input" value="${r}" onchange="updateRemark(${empIdx}, '${dateKey}', this.value)">
+                    </td>`;
+                }
+
+                let remAL = (Number(emp.baseAL) || 0) - usedAL;
+
+                if (showReal) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff"><strong>${realOff}</strong></td>`;
+                if (showTarget) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${totalOffTarget}</td>`;
+                if (showAL) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${usedAL > 0 ? `<span class="text-warning">${usedAL}</span>` : '0'}</td>`;
+                if (showOT) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${earnedOT > 0 ? `<span class="text-success">${earnedOT}</span>` : '0'}</td>`;
+                if (showRemAL) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${remAL < 0 ? `<span class="text-danger">${remAL}</span>` : remAL}</td>`;
+                
+                shiftRow += `</tr>`;
+                remarkRow += `</tr>`;
+                tbody.innerHTML += shiftRow + remarkRow;
+            });
+
+            // 出勤總人數 (A出勤、B出勤、C出勤)
+            let tfoot = document.getElementById('scheduleFoot');
+            let classesToCount = ['A', 'B', 'C'];
+            let footHtml = '';
+
+            classesToCount.forEach(cls => {
+                footHtml += `<tr style="background-color: var(--stat-bg); font-weight: bold; border-top: 1px solid #ccc;">
+                    <td class="name-col" style="text-align:left; padding-left:4px;">${cls}出勤</td>`;
+                
+                for(let i=1; i<=daysInMonth; i++) {
+                    let d = new Date(year, month-1, i).getDay();
+                    let reqIdx = (d === 0) ? 6 : d - 1;
+                    let mpConfig = state.manpower.find(m => m.class.toUpperCase() === cls);
+                    let targetReq = mpConfig ? mpConfig.reqs[reqIdx] : 0;
+
+                    let count = 0;
+                    state.staff.forEach(emp => {
+                        let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
+                        let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                        if (map) {
+                            let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
+                            if (coveredSlots.includes(cls) || s.startsWith(cls)) {
+                                count++;
+                            }
+                        }
+                    });
+
+                    let textStyle = (targetReq > 0 && count < targetReq) ? 'color:#b71c1c; font-weight:bold;' : 'color:#333;';
+                    footHtml += `<td class="day-col" style="${textStyle}">${count}</td>`;
+                }
+                
+                if (extraColCount > 0) {
+                    footHtml += `<td colspan="${extraColCount}"></td>`;
+                }
+                footHtml += `</tr>`;
+            });
+            tfoot.innerHTML = footHtml;
+            
+            renderQuickRef();
+        }
+
+        function updateShift(empIdx, dateKey, val) {
+            if(!state.staff[empIdx].shifts) state.staff[empIdx].shifts = {};
+            state.staff[empIdx].shifts[dateKey] = val; 
+            renderSchedule(); 
+        }
+        function updateRemark(empIdx, dateKey, val) { 
+            if(!state.staff[empIdx].remarks) state.staff[empIdx].remarks = {};
+            state.staff[empIdx].remarks[dateKey] = val; 
+        }
+
+        function renderShiftCodes() {
+            const tbody = document.getElementById('shiftCodesBody');
+            tbody.innerHTML = state.shiftMap.map((s, i) => `
+                <tr>
+                    <td><input class="edit-input" style="width:90%" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value"></td>
+                    <td><input class="edit-input" style="width:90%" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:90%" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:90%" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
+                    <td><input type="color" value="${s.textColor}" onchange="state.shiftMap[${i}].textColor=this.value; renderSchedule();"></td>
+                    <td><input type="color" value="${s.bgColor}" onchange="state.shiftMap[${i}].bgColor=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:70px" value="${s.cover || ''}" placeholder="如:A,B,C" onchange="state.shiftMap[${i}].cover=this.value; renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.ot}" onchange="state.shiftMap[${i}].ot=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.al}" onchange="state.shiftMap[${i}].al=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.cl}" onchange="state.shiftMap[${i}].cl=Number(this.value); renderSchedule();"></td>
+                    <td><button class="btn btn-danger" onclick="delShiftCode(${i})">刪除</button></td>
+                </tr>
+            `).join('');
+            renderQuickRef();
+        }
+        function addShiftCode() {
+            state.shiftMap.push({
+                name: document.getElementById('newShiftName').value, key: document.getElementById('newShiftKey').value,
+                pos: document.getElementById('newShiftPos').value || '通用', code: document.getElementById('newShiftCode').value,
+                textColor: document.getElementById('newTextColor').value, bgColor: document.getElementById('newBgColor').value,
+                cover: document.getElementById('newShiftCover').value || '',
+                ot: Number(document.getElementById('newShiftOT').value) || 0, al: Number(document.getElementById('newShiftAL').value) || 0, cl: Number(document.getElementById('newShiftCL').value) || 0
+            });
+            ['newShiftName','newShiftKey','newShiftCode','newShiftCover'].forEach(id => document.getElementById(id).value = '');
+            ['newShiftOT','newShiftAL','newShiftCL'].forEach(id => document.getElementById(id).value = '0');
+            renderShiftCodes(); renderSchedule();
+        }
+        function delShiftCode(idx) { state.shiftMap.splice(idx, 1); renderShiftCodes(); renderSchedule(); }
+
+        function renderManpower() {
+            document.getElementById('manpowerBody').innerHTML = state.manpower.map((m, i) => `
+                <tr>
+                    <td><input class="edit-input" style="width:70px" value="${m.class}" onchange="state.manpower[${i}].class=this.value; renderSchedule();"></td>
+                    ${m.reqs.map((r, dayIdx) => `
+                        <td><input type="number" class="edit-input" style="width:30px" min="0" value="${r}" onchange="state.manpower[${i}].reqs[${dayIdx}]=Math.max(0, Number(this.value)||0); this.value=state.manpower[${i}].reqs[${dayIdx}]; renderSchedule();"></td>
+                    `).join('')}
+                    <td><button class="btn btn-danger" onclick="delManpower(${i})">刪除</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function addManpower() {
+            let reqs = []; 
+            for(let i=1; i<=7; i++) { 
+                let val = Math.max(0, Number(document.getElementById(`newMp${i}`).value) || 0);
+                reqs.push(val); 
+                document.getElementById(`newMp${i}`).value = '0'; 
+            }
+            state.manpower.push({ class: document.getElementById('newMpClass').value, reqs }); 
+            document.getElementById('newMpClass').value = ''; 
+            renderManpower(); 
+            renderSchedule();
+        }
+        function delManpower(idx) { state.manpower.splice(idx, 1); renderManpower(); renderSchedule(); }
+
+        function renderStaff() {
+            const tbody = document.getElementById('staffBody');
+            tbody.innerHTML = state.staff.map((emp, i) => `
+                <tr>
+                    <td><input class="edit-input" style="width:90%" value="${emp.id}" onchange="state.staff[${i}].id=this.value"></td>
+                    <td><input class="edit-input" style="width:90%" value="${emp.name}" onchange="state.staff[${i}].name=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:90%" value="${emp.pos}" onchange="state.staff[${i}].pos=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:90%" value="${emp.group}" onchange="state.staff[${i}].group=this.value; renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseAL}" onchange="state.staff[${i}].baseAL=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseCL}" onchange="state.staff[${i}].baseCL=Number(this.value)"></td>
+                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseOT}" onchange="state.staff[${i}].baseOT=Number(this.value)"></td>
+                    <td><button class="btn btn-danger" onclick="delStaff(${i})">刪除</button></td>
+                </tr>
+            `).join('');
+        }
+        function addStaff() {
+            state.staff.push({
+                id: document.getElementById('newStaffId').value, name: document.getElementById('newStaffName').value,
+                pos: document.getElementById('newStaffPos').value || '通用', group: document.getElementById('newStaffGroup').value,
+                baseAL: Number(document.getElementById('newStaffAL').value) || 0, baseCL: Number(document.getElementById('newStaffCL').value) || 0, baseOT: Number(document.getElementById('newStaffOT').value) || 0,
+                shifts: {}, remarks: {}
+            });
+            ['newStaffId','newStaffName','newStaffPos','newStaffGroup'].forEach(id => document.getElementById(id).value = '');
+            ['newStaffAL','newStaffCL','newStaffOT'].forEach(id => document.getElementById(id).value = '0');
+            renderStaff(); renderSchedule();
+        }
+        function delStaff(idx) { state.staff.splice(idx, 1); renderStaff(); renderSchedule(); }
+
+        // 💡 強制讓 Key 無論月份有沒有補 0 都能正確對齊 (例: 2026-08)
+function getCurrentIntervalKey() { 
+    const y = document.getElementById('deformYear').value;
+    const m = String(document.getElementById('deformMonth').value).padStart(2, '0'); // 補零成 08
+    return `${y}-${m}`; 
+}
+
+// 💡 升級版 renderIntervals：支援雙重 Key 搜尋防呆 (相容 "2026-8" 與 "2026-08")
+        function renderIntervals() {
+            const key = getCurrentIntervalKey(); // 例如 "2026-08"
+            
+            // 【修正重點】：將選單取到的值轉為數字，確實去掉開頭的 0，才能正確產生 "2026-8"
+            const rawM = Number(document.getElementById('deformMonth').value); 
+            const altKey = `${document.getElementById('deformYear').value}-${rawM}`; // 例如 "2026-8"
+
+            // 防呆搜尋：優先拿 2026-08，拿不到就拿 2026-8
+            let list = state.intervals[key] || state.intervals[altKey] || [];
+            
+            // 將正確的資料列賦值回標準 key
+            state.intervals[key] = list;
+
+            const tbody = document.getElementById('intervalsBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = list.map((int, i) => `
+                <tr>
+                    <td><input class="edit-input" style="width:90%" value="${int.name || ''}" onchange="state.intervals['${key}'][${i}].name=this.value"></td>
+                    <td><input type="number" class="edit-input" style="width:90%" value="${int.start || 1}" onchange="state.intervals['${key}'][${i}].start=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:90%" value="${int.end || 1}" onchange="state.intervals['${key}'][${i}].end=Number(this.value)"></td>
+                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqLei || 0}" onchange="state.intervals['${key}'][${i}].reqLei=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqXiu || 0}" onchange="state.intervals['${key}'][${i}].reqXiu=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqGuo || 0}" onchange="state.intervals['${key}'][${i}].reqGuo=Number(this.value); renderSchedule();"></td>
+                    <td><button class="btn btn-danger" onclick="delInterval('${key}', ${i})">刪除</button></td>
+                </tr>
+            `).join('');
+        }
+        function addInterval() {
+            const key = getCurrentIntervalKey(); if(!state.intervals[key]) state.intervals[key] = [];
+            state.intervals[key].push({
+                name: document.getElementById('newIntName').value, start: Number(document.getElementById('newIntStart').value),
+                end: Number(document.getElementById('newIntEnd').value), reqLei: Number(document.getElementById('newIntLei').value),
+                reqXiu: Number(document.getElementById('newIntXiu').value), reqGuo: Number(document.getElementById('newIntGuo').value) || 0
+            });
+            ['newIntName','newIntStart','newIntEnd','newIntLei','newIntXiu','newIntGuo'].forEach(id => document.getElementById(id).value = ''); 
+            renderIntervals();
+        }
+        function delInterval(key, idx) { state.intervals[key].splice(idx, 1); renderIntervals(); }
+        
+        function validateDeformRules() {
+            const dateVal = document.getElementById('schedule-month').value; let ints = state.intervals[dateVal] || [];
+            if(ints.length === 0) return alert('此月份尚未設定任何變形工時區間！');
+            const [year, month] = dateVal.split('-').map(Number); let resultMsg = `【${month}月份區間檢核結果】\n\n`;
+            state.staff.forEach(emp => {
+                resultMsg += `>> ${emp.name} (${emp.pos})\n`;
+                ints.forEach(int => {
+                    let leiCount = 0, xiuCount = 0, guoCount = 0;
+                    for(let i = int.start; i <= int.end; i++) {
+                        let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
+                        if (s === '例') leiCount++; if (s === '休') xiuCount++; if (s === '國') guoCount++;
+                    }
+                    let reqGuo = int.reqGuo || 0;
+                    if(leiCount >= int.reqLei && xiuCount >= int.reqXiu && guoCount >= reqGuo) {
+                        resultMsg += `  ✓ [${int.name}] 達標\n`;
+                    } else {
+                        resultMsg += `  ❌ [${int.name}] 違規！排入(例:${leiCount}, 休:${xiuCount}, 國:${guoCount}) / 需求(例:${int.reqLei}, 休:${int.reqXiu}, 國:${reqGuo})\n`;
+                    }
+                }); resultMsg += `\n`;
+            }); alert(resultMsg);
+        }
+
+        function exportFeiTengExcel() {
+            const dateVal = document.getElementById('schedule-month').value;
+            const globalStore = document.getElementById('globalStore').value;
+            const sheetName = document.getElementById('sheetName').value || 'Sheet1';
+            const [year, month] = dateVal.split('-').map(Number);
+            const strMonth = month.toString().padStart(2, '0');
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            let tableHtml = `<table border="1">`;
+            tableHtml += `<tr><td colspan="2" style="color:#0070c0;">請輸入排班年月,月份</td>`;
+            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="text-align:center;">${strMonth}</td>`;
+            tableHtml += `</tr><tr><td style="color:#217346; font-weight:bold; font-size:16px;">${year}</td><td style="color:#0070c0;">日期</td>`;
+            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="text-align:center;">${i}</td>`;
+            tableHtml += `</tr><tr><td style="color:#217346; font-weight:bold; font-size:16px;">${strMonth}</td><td style="color:#0070c0;">星期</td>`;
+            
+            for(let i=1; i<=daysInMonth; i++) {
+                let d = new Date(year, month-1, i).getDay();
+                let bg = (d === 0 || d === 6) ? 'background-color:#f4b084;' : ''; 
+                tableHtml += `<td style="text-align:center; ${bg}">${weekDays[d]}</td>`;
+            }
+            tableHtml += `</tr><tr><td style="color:#0070c0;">排班人員</td><td style="color:#0070c0;">人員姓名</td>`;
+            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="color:#a6a6a6; text-align:center; font-size:11px;">班別代碼</td>`;
+            tableHtml += `</tr>`;
+
+            state.staff.forEach(emp => {
+                let row = `<tr><td>${emp.id}</td><td>${emp.name}(${globalStore})</td>`;
+                for(let i=1; i<=daysInMonth; i++) {
+                    let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
+                    let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                    let code = map ? map.code : s;
+                    let style = code.includes(';H') ? 'color:red; font-weight:bold;' : ''; 
+                    row += `<td style="text-align:center; ${style}">${code}</td>`;
+                }
+                tableHtml += row + `</tr>`;
+            });
+            tableHtml += `</table>`;
+
+            let excelFile = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${sheetName}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>${tableHtml}</body></html>`;
+
+            const blob = new Blob([excelFile], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.download = `飛騰排班_${sheetName}_${year}${strMonth}.xls`; document.body.appendChild(link);
+            link.click(); document.body.removeChild(link);
+        }
+
+        window.onload = function() {
+            setDefaultComputerMonth();
+            if(!GAS_API_URL || GAS_API_URL.includes("AKfycbx...")) {
+                alert("請記得將代碼中的 GAS_API_URL 替換為您部署後獲得的網址！");
+            } else {
+                loadFromCloud();
+            }
+        };
+    </script>
+</body>
+</html>

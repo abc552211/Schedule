@@ -141,16 +141,17 @@
         <div style="display: flex; align-items: center; gap: 10px;">
             <!-- 修改後的寫法：加入新增門市按鈕 -->
 <label style="font-weight:bold;">套用門市:</label>
-<select id="globalStore" class="edit-input" style="width:120px; font-weight:bold; color:#0070c0;" onchange="loadFromCloud()">
+<select id="globalStore" class="edit-input" style="width:120px; font-weight:bold; color:#0070c0;">
     <option value="南崁中正">南崁中正</option>
 </select>
-<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 8px;" onclick="addNewStore()">➕ 新增門市</button>
+<button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
+<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 8px;" onclick="addNewStore('8888')">➕ 新增門市</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
-            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Firebase</button>
-            <button class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">☁️同步工作網站</button>
-            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰檔</button>
-            <button class="btn btn-line" onclick="captureAndCopyForLine()">📥 下載班表</button>
+            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存</button>
+            <button class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">寫入工作網站</button>
+            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰</button>
+            <button class="btn btn-line" onclick="captureAndCopyForLine()">📥下載班表</button>
         </div>
     </div>
 
@@ -535,47 +536,71 @@
         // 紀錄目前已通過驗證的門市，避免同一頁面重複輸入密碼
         let authenticatedStores = [];
 
-        // 💡 升級版 loadFromCloud：優先讀取雲端密碼做驗證
-        async function loadFromCloud() {
-            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+        // 💡 升級版 loadFromCloud：支援預設抓取所有門市，並透過登入按鈕觸發驗證
+        async function loadFromCloud(targetStoreName = null) {
+            const storeSelect = document.getElementById('globalStore');
 
-            showLoading(`正在驗證【${activeStore}】門市資料...`);
+            showLoading("正在同步雲端門市清單...");
 
             try {
-                const docRef = db.collection("stores").doc(activeStore);
+                // 1. 網頁剛開機時：自動去 Firebase 抓取所有建立過的門市清單填入下拉選單
+                const storesSnapshot = await db.collection("stores").get();
+                let cloudStores = ["南崁中正"]; // 確保南崁中正一定在最前面
+                
+                storesSnapshot.forEach(doc => {
+                    if (!cloudStores.includes(doc.id)) {
+                        cloudStores.push(doc.id);
+                    }
+                });
+
+                // 更新下拉選單選項
+                const currentSelected = storeSelect.value || "南崁中正";
+                storeSelect.innerHTML = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
+
+                // 如果沒有指定要登入哪一家（代表是網頁剛整理好自動執行的預設初始化，先不強制彈出密碼框）
+                if (!targetStoreName) {
+                    hideLoading();
+                    return; 
+                }
+
+                // 2. 當使用者按下【🔐 登入】後：開始讀取該門市詳細資料與密碼驗證
+                showLoading(`正在驗證【${targetStoreName}】門市權限...`);
+                const docRef = db.collection("stores").doc(targetStoreName);
                 const docSnap = await docRef.get();
 
                 if (docSnap.exists) {
                     const data = docSnap.data();
                     
-                    // 📌 優先使用雲端資料庫儲存的密碼，若無則使用預設密碼
-                    const targetPassword = data.storePassword || storePasswords[activeStore] || "1234";
+                    if (data.storePassword) {
+                        storePasswords[targetStoreName] = data.storePassword;
+                    }
+                    const targetPassword = storePasswords[targetStoreName] || "1234";
 
                     // 檢查是否已通過該門市驗證
-                    if (!authenticatedStores.includes(activeStore)) {
-                        hideLoading(); // 暫時關閉 Loading 畫面讓 prompt 彈出
-                        const inputPwd = prompt(`🔒 切換至【${activeStore}】需要權限驗證\n請輸入該門市密碼：`);
+                    if (!authenticatedStores.includes(targetStoreName)) {
+                        hideLoading();
+                        const inputPwd = prompt(`🔒 登入【${targetStoreName}】需要權限驗證\n請輸入該門市密碼：`);
 
                         if (inputPwd === null) {
-                            showToast("已取消門市切換");
+                            showToast("已取消登入");
                             return;
                         }
 
                         if (inputPwd !== targetPassword) {
-                            alert("❌ 密碼錯誤！無法存取該門市資料。");
+                            alert("❌ 密碼錯誤！無法登入該門市。");
                             return;
                         }
 
-                        authenticatedStores.push(activeStore);
-                        showToast(`🔓 【${activeStore}】驗證成功！`);
-                        showLoading(`正在載入【${activeStore}】班表...`);
+                        authenticatedStores.push(targetStoreName);
+                        showToast(`🔓 【${targetStoreName}】驗證成功！`);
+                        showLoading(`正在載入【${targetStoreName}】班表...`);
                     }
 
-                    applyDataToState(data, activeStore);
-                    showToast(`【${activeStore}】資料載入成功！`);
+                    applyDataToState(data, targetStoreName);
+                    showToast(`【${targetStoreName}】資料登入成功！`);
                 } else {
-                    applyDataToState({}, activeStore);
-                    showToast(`【${activeStore}】為新門市，請開始排班並儲存`);
+                    applyDataToState({}, targetStoreName);
+                    showToast(`【${targetStoreName}】為新門市，請開始排班並儲存`);
                 }
             } catch (err) {
                 console.error("Firebase 讀取失敗:", err);
@@ -1576,14 +1601,32 @@
                 showToast(`🧹 已清空【${emp.name}】${month} 月的個人班表`);
             }
         }
-        // 💡 新增門市時同時設定密碼
-        function addNewStore() {
-            const newStoreName = prompt("請輸入新門市名稱（例如：蘆竹診所）：");
+        // 💡 升級版：點擊按鈕後立即驗證管理者密碼，通過才能新增門市
+        function addNewStore(adminPassword) {
+            // 🔒 第一步：立刻彈出密碼驗證框
+            const inputPwd = prompt("🔒 請輸入管理者密碼以新增門市：");
+
+            if (inputPwd === null) {
+                showToast("已取消新增門市");
+                return;
+            }
+
+            // 比對密碼 (若未帶入參數則預設為 "xup69512369")
+            const correctPwd = adminPassword || "xup69512369";
+
+            if (inputPwd !== correctPwd) {
+                alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
+                return;
+            }
+
+            // 🔒 第二步：密碼正確，才允許輸入新門市名稱
+            const newStoreName = prompt("✅ 驗證成功！請輸入新門市名稱（例如：蘆竹診所）：");
             if (newStoreName && newStoreName.trim() !== "") {
                 const storeName = newStoreName.trim();
-                const newPwd = prompt(`請為【${storeName}】設定專用存取密碼：`, "1234");
                 
-                // 記錄密碼
+                // 第三步：設定該門市的專用登入密碼
+                const newPwd = prompt(`請為【${storeName}】設定日後切換專用的登入密碼：`, "1234");
+                
                 storePasswords[storeName] = newPwd || "1234";
 
                 const storeSelect = document.getElementById('globalStore');
@@ -1596,7 +1639,11 @@
                 }
 
                 storeSelect.value = storeName;
+                
+                // 自動將新門市的密碼與狀態存入 Firebase
+                saveToCloud();
                 loadFromCloud();
+                showToast(`🎉 成功建立新門市【${storeName}】！`);
             }
         }
         // 💡 點擊 [職位|組別]：一鍵清空該員「雙時段以上」的班別 (保留例休國特與備註)
@@ -1673,6 +1720,48 @@
                 console.error("同步失敗:", err);
                 alert("同步至雲端失敗：" + err);
             }
+        }
+
+        // 💡 讓使用者自行修改目前套用門市的登入密碼
+        function changeStorePassword() {
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            const currentPwd = storePasswords[activeStore] || "1234";
+
+            // 1. 要求輸入原密碼（或管理者總密碼 "xup69512369" 供雙重備份）
+            const inputOldPwd = prompt(`🔒 修改【${activeStore}】的登入密碼\n請輸入目前的門市密碼：`);
+
+            if (inputOldPwd === null) return;
+
+            // 允許用原門市密碼，或者用總管理者密碼 "xup69512369" 來修改
+            if (inputOldPwd !== currentPwd && inputOldPwd !== "xup69512369") {
+                alert("❌ 密碼錯誤！無法修改。");
+                return;
+            }
+
+            // 2. 輸入新密碼
+            const inputNewPwd = prompt(`✅ 驗證成功！請輸入【${activeStore}】的新密碼：`);
+            
+            if (inputNewPwd && inputNewPwd.trim() !== "") {
+                const newPwd = inputNewPwd.trim();
+                
+                // 3. 更新記憶體中的密碼
+                storePasswords[activeStore] = newPwd;
+
+                // 4. 自動儲存更新至 Firebase 雲端
+                saveToCloud();
+                showToast(`🔐 【${activeStore}】密碼已成功修改！`);
+            } else {
+                showToast("已取消修改（新密碼不能為空）");
+            }
+        }
+        // 💡 點擊登入按鈕後才觸發驗證並載入該門市資料
+        function handleStoreLogin() {
+            const storeSelect = document.getElementById('globalStore');
+            const selectedStore = storeSelect.value;
+            if (!selectedStore) return alert("請先選擇要登入的門市！");
+            
+            // 呼叫原本的雲端載入與驗證邏輯
+            loadFromCloud(selectedStore);
         }
     </script>
 </body>

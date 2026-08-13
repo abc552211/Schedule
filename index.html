@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>排班與人力控管系統 - Firebase 版</title>
+    <title>桃園南崁排班系統</title>
 
     <!-- 載入 html2canvas 套件 (用於一鍵班表截圖) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -148,6 +148,7 @@
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
             <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Firebase</button>
+            <button class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">☁️同步工作網站</button>
             <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰檔</button>
             <button class="btn btn-line" onclick="captureAndCopyForLine()">📥 下載班表</button>
         </div>
@@ -1628,6 +1629,49 @@
                 }
                 renderSchedule();
                 showToast(`🧹 已保留假別，並清空【${emp.name}】的多時段班別`);
+            }
+        }
+        // 💡 將南崁中正當前班表自動推送到 Google Sheet 與 Supabase
+        async function syncToGoogleSheetAndSupabase() {
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            
+            // 僅限南崁中正或全面套用，依照您的需求
+            if (activeStore !== "南崁中正") {
+                if(!confirm(`目前選擇的門市是【${activeStore}】，確定要同步至雲端試算表嗎？`)) return;
+            }
+
+            showLoading("正在將班表同步至 Google Sheet 與 Supabase...");
+
+            // 準備要傳送給 Google Apps Script 的 payload
+            let scheduleShifts = {};
+            state.staff.forEach(emp => {
+                scheduleShifts[emp.uid || emp.id] = emp.shifts || {};
+            });
+
+            const payloadData = {
+                storeKey: activeStore,
+                staff: state.staff
+            };
+
+            // 替換下方引號內的網址為你剛剛部署得到的 Google Apps Script 網頁應用程式網址
+            const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz5qxE_M2klNAyyiGKNRp7rzQ6NlvREYSlEIp9uvxns9rJJyGdiFI8D8SPLPQofywQi/exec"; 
+
+            try {
+                const response = await fetch(GAS_WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Google Apps Script 跨域標準設定
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payloadData)
+                });
+
+                hideLoading();
+                showToast("🚀 班表已成功同步至 Google Sheet 與 Supabase！");
+            } catch (err) {
+                hideLoading();
+                console.error("同步失敗:", err);
+                alert("同步至雲端失敗：" + err);
             }
         }
     </script>

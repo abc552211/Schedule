@@ -8,6 +8,10 @@
     <!-- 載入 html2canvas 套件 (用於一鍵班表截圖) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
+    <!-- 💡 新增：載入 SheetJS 套件 (用於產生飛騰系統認可的真實 Excel 檔案) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    
     <!-- 載入 Firebase 10.8.0 Compat SDK (最適合傳統 HTML/JS) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -45,8 +49,10 @@
             white-space: nowrap; 
             table-layout: auto; 
         }
-        th, td { border: 1px solid #ced4da; padding: 2px 1px; box-sizing: border-box; }
+        /* 💡 優化：格線改為淺色極細線，並確保表格內容絕對垂直置中 */
+        th, td { border: 0.5px solid #e4e4e4; padding: 2px 1px; box-sizing: border-box; vertical-align: middle; }
         th { font-weight: 600; }
+
         
         .day-col { 
             width: auto !important; 
@@ -72,7 +78,8 @@
         .day-sat { background-color: var(--sat-color) !important; color: #0d47a1 !important; }
         .day-sun { background-color: var(--sun-color) !important; color: #b71c1c !important; }
         
-        input.cell-input { width: 100%; border: none; text-align: center; font-size: 12px; background: transparent; padding: 1px 0; font-weight: bold; cursor: text; }
+        /* 💡 優化：移除干擾高度的 padding，使用 line-height 置中，避免截圖被卡掉 */
+        input.cell-input { width: 100%; border: none; text-align: center; font-size: 12px; background: transparent; padding: 0; margin: 0; font-weight: bold; cursor: text; line-height: normal; vertical-align: middle; }
         input.cell-input:focus { background-color: rgba(255, 255, 255, 0.9); outline: 2px solid #2196f3; }
         
         input.remark-input { width: 100%; height: var(--remark-height); border: none; text-align: center; font-size: 11px; color: #555; background: transparent; padding: 0; }
@@ -132,15 +139,17 @@
     <div class="top-navbar">
         <h2 style="margin: 0; font-size: 18px;">排班與人力控管系統</h2>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <label style="font-weight:bold;">套用門市:</label>
-            <select id="globalStore" class="edit-input" style="width:130px; font-weight:bold; color:#0070c0;" onchange="loadFromCloud()">
-                <option value="南崁中正">南崁中正</option>
-            </select>
+            <!-- 修改後的寫法：加入新增門市按鈕 -->
+<label style="font-weight:bold;">套用門市:</label>
+<select id="globalStore" class="edit-input" style="width:120px; font-weight:bold; color:#0070c0;" onchange="loadFromCloud()">
+    <option value="南崁中正">南崁中正</option>
+</select>
+<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 8px;" onclick="addNewStore()">➕ 新增門市</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
             <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Firebase</button>
-            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰 Excel</button>
-            <button class="btn btn-line" onclick="captureAndCopyForLine()">📸 截圖傳送到 LINE</button>
+            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰檔</button>
+            <button class="btn btn-line" onclick="captureAndCopyForLine()">📥 下載班表</button>
         </div>
     </div>
 
@@ -206,24 +215,28 @@
             <h3>班別與飛騰系統代碼對照表</h3>
             <p style="color:#d32f2f;">💡 <strong>提示 (如 B特、B補)：</strong>若該假別請假期間不計入人力，請將【涵蓋時段】<strong>留空</strong>，並設定對應特休/補休時數。</p>
             <div class="card">
-                <table style="width: 100%;">
+                <table style="width: auto;">
                     <thead>
-                        <tr><th>名稱</th><th>畫面簡寫</th><th>職位</th><th>飛騰代碼</th><th>文字色</th><th>背景色</th><th>涵蓋時段</th><th>加班(增)</th><th>特休(扣)</th><th>補休(扣)</th><th>操作</th></tr>
+                        <!-- 💡 新增了最後一欄：對照簡寫 -->
+                        <tr><th>名稱</th><th>畫面簡寫</th><th>職位</th><th>飛騰代碼</th><th>文字色</th><th>背景色</th><th>涵蓋時段</th><th>加班(增)</th><th>特休(扣)</th><th>補休(扣)</th><th>自動排班</th><th>操作</th><th>對照簡寫</th></tr>
                     </thead>
                     <tbody id="shiftCodesBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td><input type="text" id="newShiftName" class="edit-input" style="width:90%" placeholder="名稱"></td>
-                            <td><input type="text" id="newShiftKey" class="edit-input" style="width:90%" placeholder="簡寫"></td>
-                            <td><input type="text" id="newShiftPos" class="edit-input" style="width:90%" value="通用"></td>
-                            <td><input type="text" id="newShiftCode" class="edit-input" style="width:90%" placeholder="代碼"></td>
+                            <td><input type="text" id="newShiftName" class="edit-input" style="width:80px" placeholder="名稱"></td>
+                            <td><input type="text" id="newShiftKey" class="edit-input" style="width:50px" placeholder="簡寫"></td>
+                            <td><input type="text" id="newShiftPos" class="edit-input" style="width:50px" value="通用"></td>
+                            <td><input type="text" id="newShiftCode" class="edit-input" style="width:70px" placeholder="代碼"></td>
                             <td><input type="color" id="newTextColor" value="#ffffff"></td>
                             <td><input type="color" id="newBgColor" value="#2196f3"></td>
                             <td><input type="text" id="newShiftCover" class="edit-input" style="width:80px" placeholder="A,B,C"></td>
                             <td><input type="number" id="newShiftOT" class="edit-input" style="width:40px" step="0.5" value="0"></td>
                             <td><input type="number" id="newShiftAL" class="edit-input" style="width:40px" step="0.5" value="0"></td>
                             <td><input type="number" id="newShiftCL" class="edit-input" style="width:40px" step="0.5" value="0"></td>
+                            <td><input type="checkbox" id="newShiftAutoAssign" checked style="cursor:pointer; transform:scale(1.2);"></td>
                             <td><button class="btn btn-primary" onclick="addShiftCode()">新增</button></td>
+                            <!-- 💡 配合對齊增加的一格空欄 -->
+                            <td style="color:#ccc; text-align:center;">-</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -234,21 +247,21 @@
         <div id="tab-manpower" class="tab-page">
             <h3>每日人力最低需求設定</h3>
             <div class="card">
-                <table style="width: 600px;">
+                <table style="width: auto;">
                     <thead>
                         <tr><th>時段代碼</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th><th>操作</th></tr>
                     </thead>
                     <tbody id="manpowerBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td><input type="text" id="newMpClass" class="edit-input" style="width:70px" placeholder="如: A"></td>
-                            <td><input type="number" id="newMp1" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp2" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp3" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp4" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp5" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp6" class="edit-input" style="width:30px" min="0" value="0"></td>
-                            <td><input type="number" id="newMp7" class="edit-input" style="width:30px" min="0" value="0"></td>
+                            <td><input type="text" id="newMpClass" class="edit-input" style="width:60px" placeholder="如: A"></td>
+                            <td><input type="number" id="newMp1" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp2" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp3" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp4" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp5" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp6" class="edit-input" style="width:40px" min="0" value="0"></td>
+                            <td><input type="number" id="newMp7" class="edit-input" style="width:40px" min="0" value="0"></td>
                             <td><button class="btn btn-primary" onclick="addManpower()">新增</button></td>
                         </tr>
                     </tfoot>
@@ -260,18 +273,18 @@
         <div id="tab-staff" class="tab-page">
             <h3>員工名冊與時數餘額統計</h3>
             <div class="card">
-                <table style="width: 100%;">
+                <table style="width: auto;">
                     <thead><tr><th>員工編號</th><th>姓名</th><th>職位</th><th>組別</th><th>特休剩餘(H)</th><th>補休剩餘(H)</th><th>加班累計(H)</th><th>操作</th></tr></thead>
                     <tbody id="staffBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td><input type="text" id="newStaffId" class="edit-input" style="width:90%" placeholder="編號"></td>
-                            <td><input type="text" id="newStaffName" class="edit-input" style="width:90%" placeholder="姓名"></td>
-                            <td><input type="text" id="newStaffPos" class="edit-input" style="width:90%" placeholder="職位"></td>
-                            <td><input type="text" id="newStaffGroup" class="edit-input" style="width:90%" placeholder="組別"></td>
-                            <td><input type="number" id="newStaffAL" class="edit-input" style="width:60px" step="0.5" value="0"></td>
-                            <td><input type="number" id="newStaffCL" class="edit-input" style="width:60px" step="0.5" value="0"></td>
-                            <td><input type="number" id="newStaffOT" class="edit-input" style="width:60px" step="0.5" value="0"></td>
+                            <td><input type="text" id="newStaffId" class="edit-input" style="width:70px" placeholder="編號"></td>
+                            <td><input type="text" id="newStaffName" class="edit-input" style="width:70px" placeholder="姓名"></td>
+                            <td><input type="text" id="newStaffPos" class="edit-input" style="width:60px" placeholder="職位"></td>
+                            <td><input type="text" id="newStaffGroup" class="edit-input" style="width:60px" placeholder="組別"></td>
+                            <td><input type="number" id="newStaffAL" class="edit-input" style="width:50px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newStaffCL" class="edit-input" style="width:50px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newStaffOT" class="edit-input" style="width:50px" step="0.5" value="0"></td>
                             <td><button class="btn btn-primary" onclick="addStaff()">新增</button></td>
                         </tr>
                     </tfoot>
@@ -301,19 +314,19 @@
                 </select>
             </div>
             <div class="card">
-                <table style="width: 900px;">
+                <table style="width: auto;">
                     <thead>
                         <tr><th>區間名稱</th><th>開始日期(1~31)</th><th>結束日期</th><th>應有【例】假數</th><th>應有【休】假數</th><th>應有【國】假數</th><th>操作</th></tr>
                     </thead>
                     <tbody id="intervalsBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td><input type="text" id="newIntName" class="edit-input" style="width:90%" placeholder="例: 前兩週"></td>
-                            <td><input type="number" id="newIntStart" class="edit-input" style="width:90%" placeholder="1"></td>
-                            <td><input type="number" id="newIntEnd" class="edit-input" style="width:90%" placeholder="14"></td>
-                            <td><input type="number" id="newIntLei" class="edit-input" style="width:90%" placeholder="2"></td>
-                            <td><input type="number" id="newIntXiu" class="edit-input" style="width:90%" placeholder="2"></td>
-                            <td><input type="number" id="newIntGuo" class="edit-input" style="width:90%" placeholder="1"></td>
+                            <td><input type="text" id="newIntName" class="edit-input" style="width:80px" placeholder="例: 前兩週"></td>
+                            <td><input type="number" id="newIntStart" class="edit-input" style="width:50px" placeholder="1"></td>
+                            <td><input type="number" id="newIntEnd" class="edit-input" style="width:50px" placeholder="14"></td>
+                            <td><input type="number" id="newIntLei" class="edit-input" style="width:50px" placeholder="2"></td>
+                            <td><input type="number" id="newIntXiu" class="edit-input" style="width:50px" placeholder="2"></td>
+                            <td><input type="number" id="newIntGuo" class="edit-input" style="width:50px" placeholder="1"></td>
                             <td><button class="btn btn-primary" onclick="addInterval()">新增區間</button></td>
                         </tr>
                     </tfoot>
@@ -409,53 +422,156 @@
             state.dailyNotes[dateKey] = val;
         }
 
-        function captureAndCopyForLine() {
-            showLoading("正在生成班表截圖...");
-            const element = document.getElementById('scheduleTable');
-            const dateVal = document.getElementById('schedule-month').value;
+        // 💡 升級版：高畫質、終極防截斷、自訂人力提示與靜默下載
+        async function captureAndCopyForLine() {
+            // 📌 1. 下載前詢問：是否要顯示人力提示？
+            const includeAlert = confirm("截圖是否要包含上方的【人力提示】？\n(按「確定」保留，按「取消」隱藏)");
+            
+            showLoading("正在生成高畫質班表截圖...");
+            const tableElement = document.getElementById('scheduleTable');
+            const scrollWrapper = tableElement.closest('div[style*="overflow-x: auto"]');
+            
+            const dateVal = document.getElementById('schedule-month').value; 
+            const [year, month] = dateVal.split('-');
+            const storeName = document.getElementById('globalStore').value || "";
+            const fileNameStr = `${year}${month}${storeName}`;
 
-            html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-                canvas.toBlob(blob => {
-                    try {
-                        const item = new ClipboardItem({ "image/png": blob });
-                        navigator.clipboard.write([item]).then(() => {
-                            hideLoading();
-                            alert("📸 班表截圖已複製到剪貼簿！\n請直接切換到 LINE 聊天視窗按下 Ctrl + V 貼上傳送！");
-                        }).catch(err => {
-                            hideLoading();
-                            downloadImageBlob(blob, `班表_${dateVal}.png`);
-                            alert("📸 班表截圖已下載至電腦，可直接拖入 LINE 發送！");
-                        });
-                    } catch (e) {
-                        hideLoading();
-                        downloadImageBlob(blob, `班表_${dateVal}.png`);
-                        alert("📸 班表截圖已下載，可直接發送到 LINE！");
-                    }
-                });
+            // 📌 2. 隱藏不必要的元素 (綠勾勾/異常圖示，以及依據使用者選擇隱藏人力提示)
+            document.querySelectorAll('.val-icon').forEach(el => el.style.display = 'none');
+            const alertRow = document.querySelector('.alert-row');
+            const origAlertDisplay = alertRow ? alertRow.style.display : '';
+            if (!includeAlert && alertRow) alertRow.style.display = 'none';
+
+            const originalOverflow = scrollWrapper ? scrollWrapper.style.overflowX : '';
+            if (scrollWrapper) scrollWrapper.style.overflowX = 'visible'; 
+            
+            // 📌 3. 終極防截斷法：將 input 暫時替換為 flex 排版的 <span>，讓截圖完美垂直置中
+            document.querySelectorAll('.cell-input, .remark-input').forEach(input => {
+                const span = document.createElement('span');
+                span.className = 'temp-span-for-capture';
+                span.style.cssText = input.style.cssText; // 複製原本的顏色與背景
+                span.style.display = 'flex';
+                span.style.alignItems = 'center';
+                span.style.justifyContent = 'center';
+                span.style.width = '100%';
+                span.style.height = '100%';
+                span.style.minHeight = '18px'; // 確保格子有足夠高度
+                span.innerText = input.value;
+                input.style.display = 'none'; // 隱藏原本容易截斷的 input
+                input.parentNode.insertBefore(span, input);
             });
+
+            const origPadding = tableElement.style.padding;
+            tableElement.style.padding = '2px';
+
+            try {
+                // 生成極致畫質
+                const canvas = await html2canvas(tableElement, { 
+                    scale: 3, 
+                    backgroundColor: "#ffffff",
+                    useCORS: true,
+                    logging: false
+                });
+
+                // 📌 4. 截圖後：立刻還原畫面原本的狀態
+                if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
+                if (alertRow) alertRow.style.display = origAlertDisplay;
+                document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
+                
+                // 把原本的 input 變回來，刪除暫時的 span
+                document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
+                document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
+                
+                tableElement.style.padding = origPadding;
+
+                // 📌 5. 靜默下載，移除煩人的系統 alert
+                hideLoading();
+                downloadJPG(canvas, fileNameStr);
+                
+            } catch (err) {
+                // 發生錯誤也要記得還原畫面
+                if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
+                if (alertRow) alertRow.style.display = origAlertDisplay;
+                document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
+                document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
+                document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
+                tableElement.style.padding = origPadding;
+                
+                hideLoading();
+                alert("截圖發生錯誤：" + err);
+            }
         }
 
-        function downloadImageBlob(blob, filename) {
+        // 💡 乾淨單純的 JPG 下載函式 (去除了原本剪貼簿多餘的邏輯)
+        function downloadJPG(canvas, fileNameStr) {
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
+            link.download = `${fileNameStr}.jpg`;
+            link.href = canvas.toDataURL("image/jpeg", 1.0); 
             link.click();
         }
 
-        // 💡 修正版 loadFromCloud：修復 docSnap.exists 屬性寫法
+        // 💡 輔助下載最高畫質 JPG 函式 (自動套用組合檔名)
+        function downloadJPG(canvas, fileNameStr) {
+            const link = document.createElement('a');
+            link.download = `${fileNameStr}.jpg`;
+            link.href = canvas.toDataURL("image/jpeg", 1.0); // 1.0 代表 100% 最高畫質無壓縮
+            link.click();
+        }
+
+        function fallbackDownloadJPG(canvas, fileNameStr) {
+            hideLoading();
+            downloadJPG(canvas, fileNameStr);
+            alert("📸 班表已自動下載為【高畫質 JPG】圖檔！\n您可以直接將下載的檔案拖入 LINE 視窗發送。");
+        }
+
+        // 💡 門市密碼表 (可依需求修改各門市密碼)
+        const storePasswords = {
+            "南崁中正": "6511", 
+            
+            
+        };
+
+        // 紀錄目前已通過驗證的門市，避免同一頁面重複輸入密碼
+        let authenticatedStores = [];
+
+        // 💡 升級版 loadFromCloud：優先讀取雲端密碼做驗證
         async function loadFromCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
-            showLoading(`正在從 Firebase 讀取【${activeStore}】資料...`);
+
+            showLoading(`正在驗證【${activeStore}】門市資料...`);
 
             try {
                 const docRef = db.collection("stores").doc(activeStore);
                 const docSnap = await docRef.get();
 
-                // 📌【關鍵修復】：Compat 版中 exists 是屬性 (docSnap.exists)，不要加括號 ()
                 if (docSnap.exists) {
                     const data = docSnap.data();
+                    
+                    // 📌 優先使用雲端資料庫儲存的密碼，若無則使用預設密碼
+                    const targetPassword = data.storePassword || storePasswords[activeStore] || "1234";
+
+                    // 檢查是否已通過該門市驗證
+                    if (!authenticatedStores.includes(activeStore)) {
+                        hideLoading(); // 暫時關閉 Loading 畫面讓 prompt 彈出
+                        const inputPwd = prompt(`🔒 切換至【${activeStore}】需要權限驗證\n請輸入該門市密碼：`);
+
+                        if (inputPwd === null) {
+                            showToast("已取消門市切換");
+                            return;
+                        }
+
+                        if (inputPwd !== targetPassword) {
+                            alert("❌ 密碼錯誤！無法存取該門市資料。");
+                            return;
+                        }
+
+                        authenticatedStores.push(activeStore);
+                        showToast(`🔓 【${activeStore}】驗證成功！`);
+                        showLoading(`正在載入【${activeStore}】班表...`);
+                    }
+
                     applyDataToState(data, activeStore);
-                    showToast(`【${activeStore}】Firebase 資料載入成功！`);
+                    showToast(`【${activeStore}】資料載入成功！`);
                 } else {
                     applyDataToState({}, activeStore);
                     showToast(`【${activeStore}】為新門市，請開始排班並儲存`);
@@ -468,20 +584,27 @@
             }
         }
 
-        // 💡 同步寫入 Firebase Firestore
+        // 💡 升級版 saveToCloud：加入隱藏 uid 機制，允許員工編號完全留空
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             showLoading(`正在將【${activeStore}】寫入 Firebase...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
-            state.staff.forEach(emp => {
-                scheduleShifts[emp.id] = emp.shifts || {};
-                scheduleRemarks[emp.id] = emp.remarks || {};
+            
+            state.staff.forEach((emp, idx) => {
+                // 📌 核心修正：為每位員工配發底層專屬 uid (若無則建立)，取代原本用來當 Key 的 emp.id
+                if (!emp.uid) {
+                    emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
+                }
+                
+                scheduleShifts[emp.uid] = emp.shifts || {};
+                scheduleRemarks[emp.uid] = emp.remarks || {};
             });
 
             const payload = {
                 storeKey: activeStore,
+                storePassword: storePasswords[activeStore] || "1234",
                 staff: state.staff,
                 shiftMap: state.shiftMap,
                 manpower: state.manpower,
@@ -493,7 +616,7 @@
 
             try {
                 await db.collection("stores").doc(activeStore).set(payload, { merge: true });
-                showToast(`【${activeStore}】成功儲存至 Firebase！`);
+                showToast(`【${activeStore}】資料與密碼成功儲存至 Firebase！`);
             } catch (err) {
                 console.error("Firebase 儲存失敗:", err);
                 alert("儲存至 Firebase 失敗：" + err.message);
@@ -502,6 +625,7 @@
             }
         }
 
+        // 💡 升級版 applyDataToState：讀取時對應底層 uid
         function applyDataToState(data, activeStore) {
             const storeSelect = document.getElementById('globalStore');
             if (data.stores && data.stores.length > 0) {
@@ -517,12 +641,17 @@
             state.dailyNotes = data.dailyNotes || {};
 
             if (data.schedule) {
-                state.staff.forEach(emp => {
+                state.staff.forEach((emp, idx) => {
                     emp.shifts = {};
                     emp.remarks = {};
 
-                    const rawShifts = (data.schedule.shifts && data.schedule.shifts[emp.id]) ? data.schedule.shifts[emp.id] : {};
-                    const rawRemarks = (data.schedule.remarks && data.schedule.remarks[emp.id]) ? data.schedule.remarks[emp.id] : {};
+                    // 📌 核心修正：讀取時認明隱藏 uid，確保班表對得起來
+                    if (!emp.uid) {
+                        emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
+                    }
+
+                    const rawShifts = (data.schedule.shifts && data.schedule.shifts[emp.uid]) ? data.schedule.shifts[emp.uid] : {};
+                    const rawRemarks = (data.schedule.remarks && data.schedule.remarks[emp.uid]) ? data.schedule.remarks[emp.uid] : {};
 
                     Object.keys(rawShifts).forEach(dKey => {
                         let parts = String(dKey).split('-');
@@ -665,13 +794,25 @@
             tbody.innerHTML = '';
             
             state.staff.forEach((emp, empIdx) => {
-                let realOff = 0, usedAL = 0, earnedOT = 0;
+                // 💡 加入 usedCL 來計算補休時數
+                let realOff = 0, usedAL = 0, usedCL = 0, earnedOT = 0;
                 
-                // 💡 修改後的寫法：點擊姓名觸發清空，並加上提示與 hover 效果
-let nameCellHtml = `<strong style="cursor: pointer; color: #0d6efd;" onclick="clearStaffShifts(${empIdx})" title="💡 點擊可一鍵清空 ${emp.name} 當月班表">${emp.name}</strong><br><span style="font-size:10px; color:#666; font-weight:normal;">${emp.group} | ${emp.pos}</span>`;
+                // 1. 動態檢核圖示 (加入 class="val-icon" 以便截圖時自動隱藏)
+                let valUi = '';
+                if (validationResults && validationResults[emp.uid]) {
+                    if (validationResults[emp.uid].ok) {
+                        valUi = `<span class="val-icon" style="color: #198754; margin-left: 5px; font-size:14px;" title="檢核通過">✅</span>`;
+                    } else {
+                        valUi = `<button class="btn btn-danger val-icon" style="padding: 1px 5px; font-size: 11px; margin-left: 5px; border-radius: 4px; font-weight:bold; cursor:pointer;" onclick="highlightErrors(${empIdx}); event.stopPropagation();">⚠️異常</button>`;
+                    }
+                }
 
-let shiftRow = `<tr>
-    <td rowspan="2" class="name-col" style="background:#fff; line-height:1.2; padding:2px;">${nameCellHtml}</td>`;
+                // 2. 設定隱藏按鈕：讓 [組別 | 職位] 變成可點擊的清空按鈕
+                let groupPosText = `<span style="font-size:10px; color:#666; font-weight:normal; cursor:pointer;" onclick="clearMultiSlotShifts(${empIdx})" title="💡 點擊清空該員【雙時段以上】出勤班別">${emp.group} | ${emp.pos}</span>`;
+                let nameCellHtml = `<strong style="cursor: pointer; color: #0d6efd;" onclick="clearStaffShifts(${empIdx})" title="一鍵清空全部">${emp.name}</strong>${valUi}<br>${groupPosText}`;
+                
+                let shiftRow = `<tr>
+                    <td rowspan="2" class="name-col" style="background:#fff; line-height:1.2; padding:2px;">${nameCellHtml}</td>`;
                 
                 let remarkRow = `<tr>`;
 
@@ -679,6 +820,7 @@ let shiftRow = `<tr>
                     let dateKey = `${year}-${month}-${i}`;
                     let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
                     let r = (emp.remarks && emp.remarks[dateKey]) ? emp.remarks[dateKey] : '';
+                    
                     if (['休', '例', '國'].includes(s)) realOff++;
 
                     let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
@@ -686,17 +828,21 @@ let shiftRow = `<tr>
                     
                     if (map) {
                         usedAL += (Number(map.al) || 0);
+                        usedCL += (Number(map.cl) || 0); // 累加補休時數
                         earnedOT += (Number(map.ot) || 0);
                     }
 
                     shiftRow += `<td class="day-col" style="${styleStr}">
-                        <input class="cell-input" style="${styleStr}" value="${s}" onchange="updateShift(${empIdx}, '${dateKey}', this.value)">
+                        <input id="shift-${empIdx}-${i}" class="cell-input" style="${styleStr}" value="${s}" onchange="updateShift(${empIdx}, '${dateKey}', this.value)">
                     </td>`;
 
                     remarkRow += `<td class="day-col" style="background:#f9f9f9;">
                         <input class="remark-input" value="${r}" onchange="updateRemark(${empIdx}, '${dateKey}', this.value)">
                     </td>`;
                 }
+
+                // 📌 3. 精準實休計算：原本的例休國天數 + (特休總時數 + 補休總時數) / 8
+                realOff += (usedAL + usedCL) / 8;
 
                 let remAL = (Number(emp.baseAL) || 0) - usedAL;
 
@@ -765,41 +911,53 @@ let shiftRow = `<tr>
             const tbody = document.getElementById('shiftCodesBody');
             tbody.innerHTML = state.shiftMap.map((s, i) => `
                 <tr>
-                    <td><input class="edit-input" style="width:90%" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value"></td>
-                    <td><input class="edit-input" style="width:90%" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:90%" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:90%" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
+                    <td><input class="edit-input" style="width:80px" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value"></td>
+                    <td><input class="edit-input" style="width:50px" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:50px" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:70px" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
                     <td><input type="color" value="${s.textColor}" onchange="state.shiftMap[${i}].textColor=this.value; renderSchedule();"></td>
                     <td><input type="color" value="${s.bgColor}" onchange="state.shiftMap[${i}].bgColor=this.value; renderSchedule();"></td>
                     <td><input class="edit-input" style="width:70px" value="${s.cover || ''}" placeholder="如:A,B,C" onchange="state.shiftMap[${i}].cover=this.value; renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.ot}" onchange="state.shiftMap[${i}].ot=Number(this.value); renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.al}" onchange="state.shiftMap[${i}].al=Number(this.value); renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.cl}" onchange="state.shiftMap[${i}].cl=Number(this.value); renderSchedule();"></td>
+                    <td><input type="checkbox" ${s.autoAssign !== false ? 'checked' : ''} style="cursor:pointer; transform:scale(1.2);" onchange="state.shiftMap[${i}].autoAssign=this.checked;"></td>
                     <td><button class="btn btn-danger" onclick="delShiftCode(${i})">刪除</button></td>
+                    
+                    <!-- 💡 新增：唯讀的畫面簡寫預覽，並自動套用設定的文字與背景色 -->
+                    <td style="text-align:center; padding: 0 8px;">
+                        <span style="display:inline-block; width:100%; font-weight:bold; border-radius:3px; padding:2px 0; color:${s.textColor}; background-color:${s.bgColor};">
+                            ${s.key}
+                        </span>
+                    </td>
                 </tr>
             `).join('');
             renderQuickRef();
         }
+
         function addShiftCode() {
             state.shiftMap.push({
                 name: document.getElementById('newShiftName').value, key: document.getElementById('newShiftKey').value,
                 pos: document.getElementById('newShiftPos').value || '通用', code: document.getElementById('newShiftCode').value,
                 textColor: document.getElementById('newTextColor').value, bgColor: document.getElementById('newBgColor').value,
                 cover: document.getElementById('newShiftCover').value || '',
-                ot: Number(document.getElementById('newShiftOT').value) || 0, al: Number(document.getElementById('newShiftAL').value) || 0, cl: Number(document.getElementById('newShiftCL').value) || 0
+                ot: Number(document.getElementById('newShiftOT').value) || 0, al: Number(document.getElementById('newShiftAL').value) || 0, cl: Number(document.getElementById('newShiftCL').value) || 0,
+                autoAssign: document.getElementById('newShiftAutoAssign').checked // 👈 儲存自動排班設定
             });
             ['newShiftName','newShiftKey','newShiftCode','newShiftCover'].forEach(id => document.getElementById(id).value = '');
             ['newShiftOT','newShiftAL','newShiftCL'].forEach(id => document.getElementById(id).value = '0');
+            document.getElementById('newShiftAutoAssign').checked = true;
             renderShiftCodes(); renderSchedule();
         }
+       
         function delShiftCode(idx) { state.shiftMap.splice(idx, 1); renderShiftCodes(); renderSchedule(); }
 
         function renderManpower() {
             document.getElementById('manpowerBody').innerHTML = state.manpower.map((m, i) => `
                 <tr>
-                    <td><input class="edit-input" style="width:70px" value="${m.class}" onchange="state.manpower[${i}].class=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:60px" value="${m.class}" onchange="state.manpower[${i}].class=this.value; renderSchedule();"></td>
                     ${m.reqs.map((r, dayIdx) => `
-                        <td><input type="number" class="edit-input" style="width:30px" min="0" value="${r}" onchange="state.manpower[${i}].reqs[${dayIdx}]=Math.max(0, Number(this.value)||0); this.value=state.manpower[${i}].reqs[${dayIdx}]; renderSchedule();"></td>
+                        <td><input type="number" class="edit-input" style="width:40px" min="0" value="${r}" onchange="state.manpower[${i}].reqs[${dayIdx}]=Math.max(0, Number(this.value)||0); this.value=state.manpower[${i}].reqs[${dayIdx}]; renderSchedule();"></td>
                     `).join('')}
                     <td><button class="btn btn-danger" onclick="delManpower(${i})">刪除</button></td>
                 </tr>
@@ -824,22 +982,27 @@ let shiftRow = `<tr>
             const tbody = document.getElementById('staffBody');
             tbody.innerHTML = state.staff.map((emp, i) => `
                 <tr>
-                    <td><input class="edit-input" style="width:90%" value="${emp.id}" onchange="state.staff[${i}].id=this.value"></td>
-                    <td><input class="edit-input" style="width:90%" value="${emp.name}" onchange="state.staff[${i}].name=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:90%" value="${emp.pos}" onchange="state.staff[${i}].pos=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:90%" value="${emp.group}" onchange="state.staff[${i}].group=this.value; renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseAL}" onchange="state.staff[${i}].baseAL=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseCL}" onchange="state.staff[${i}].baseCL=Number(this.value)"></td>
-                    <td><input type="number" class="edit-input" style="width:60px" step="0.5" value="${emp.baseOT}" onchange="state.staff[${i}].baseOT=Number(this.value)"></td>
+                    <td><input class="edit-input" style="width:70px" value="${emp.id}" onchange="state.staff[${i}].id=this.value"></td>
+                    <td><input class="edit-input" style="width:70px" value="${emp.name}" onchange="state.staff[${i}].name=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:60px" value="${emp.pos}" onchange="state.staff[${i}].pos=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:60px" value="${emp.group}" onchange="state.staff[${i}].group=this.value; renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" step="0.5" value="${emp.baseAL}" onchange="state.staff[${i}].baseAL=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" step="0.5" value="${emp.baseCL}" onchange="state.staff[${i}].baseCL=Number(this.value)"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" step="0.5" value="${emp.baseOT}" onchange="state.staff[${i}].baseOT=Number(this.value)"></td>
                     <td><button class="btn btn-danger" onclick="delStaff(${i})">刪除</button></td>
                 </tr>
             `).join('');
         }
         function addStaff() {
             state.staff.push({
-                id: document.getElementById('newStaffId').value, name: document.getElementById('newStaffName').value,
-                pos: document.getElementById('newStaffPos').value || '通用', group: document.getElementById('newStaffGroup').value,
-                baseAL: Number(document.getElementById('newStaffAL').value) || 0, baseCL: Number(document.getElementById('newStaffCL').value) || 0, baseOT: Number(document.getElementById('newStaffOT').value) || 0,
+                uid: `uid_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // 📌 核心修正：一新增就發配隱藏 UID
+                id: document.getElementById('newStaffId').value, // 允許畫面上的編號直接留空
+                name: document.getElementById('newStaffName').value,
+                pos: document.getElementById('newStaffPos').value || '通用', 
+                group: document.getElementById('newStaffGroup').value,
+                baseAL: Number(document.getElementById('newStaffAL').value) || 0, 
+                baseCL: Number(document.getElementById('newStaffCL').value) || 0, 
+                baseOT: Number(document.getElementById('newStaffOT').value) || 0,
                 shifts: {}, remarks: {}
             });
             ['newStaffId','newStaffName','newStaffPos','newStaffGroup'].forEach(id => document.getElementById(id).value = '');
@@ -867,12 +1030,12 @@ let shiftRow = `<tr>
 
             tbody.innerHTML = list.map((int, i) => `
                 <tr>
-                    <td><input class="edit-input" style="width:90%" value="${int.name || ''}" onchange="state.intervals['${key}'][${i}].name=this.value"></td>
-                    <td><input type="number" class="edit-input" style="width:90%" value="${int.start || 1}" onchange="state.intervals['${key}'][${i}].start=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:90%" value="${int.end || 1}" onchange="state.intervals['${key}'][${i}].end=Number(this.value)"></td>
-                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqLei || 0}" onchange="state.intervals['${key}'][${i}].reqLei=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqXiu || 0}" onchange="state.intervals['${key}'][${i}].reqXiu=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:90%" value="${int.reqGuo || 0}" onchange="state.intervals['${key}'][${i}].reqGuo=Number(this.value); renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:80px" value="${int.name || ''}" onchange="state.intervals['${key}'][${i}].name=this.value"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" value="${int.start || 1}" onchange="state.intervals['${key}'][${i}].start=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" value="${int.end || 1}" onchange="state.intervals['${key}'][${i}].end=Number(this.value)"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" value="${int.reqLei || 0}" onchange="state.intervals['${key}'][${i}].reqLei=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" value="${int.reqXiu || 0}" onchange="state.intervals['${key}'][${i}].reqXiu=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:50px" value="${int.reqGuo || 0}" onchange="state.intervals['${key}'][${i}].reqGuo=Number(this.value); renderSchedule();"></td>
                     <td><button class="btn btn-danger" onclick="delInterval('${key}', ${i})">刪除</button></td>
                 </tr>
             `).join('');
@@ -889,200 +1052,485 @@ let shiftRow = `<tr>
         }
         function delInterval(key, idx) { state.intervals[key].splice(idx, 1); renderIntervals(); }
         
-        // 💡 升級版：精準檢核變形工時 (必須剛好等於，不能多也不能少)
+        // 💡 儲存檢核結果的全域變數
+        let validationResults = null; 
+
+        // 💡 全新無彈窗檢核邏輯：計算結果後更新畫面 UI
         function validateDeformRules() {
             const dateVal = document.getElementById('schedule-month').value; 
-            let ints = state.intervals[dateVal] || [];
-            if(ints.length === 0) return alert('此月份尚未設定任何變形工時區間！');
-            
             const [year, month] = dateVal.split('-').map(Number); 
-            let resultMsg = `【${month}月份區間精準檢核結果】\n\n`;
-            let hasError = false;
+            const altKey = `${year}-${month}`;
+            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
+            
+            // 找到這行並替換：
+            if(ints.length === 0) return alert(`⚠️ 系統阻擋：無法自動編譯假別！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能依照規定為您精準轉譯。`);
+            
+            validationResults = {}; // 重置檢核結果
+            let hasGlobalError = false;
 
             state.staff.forEach(emp => {
-                resultMsg += `>> ${emp.name} (${emp.pos})\n`;
+                let empErrors = [];
+                let errorIntervals = []; // 紀錄哪些區間出錯，用來 Highlight
+
                 ints.forEach(int => {
                     let leiCount = 0, xiuCount = 0, guoCount = 0;
+                    let reqLei = Number(int.reqLei) || 0;
+                    let reqXiu = Number(int.reqXiu) || 0;
+                    let reqGuo = Number(int.reqGuo) || 0;
+
                     for(let i = int.start; i <= int.end; i++) {
-                        let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
+                        let k1 = `${year}-${month}-${i}`;
+                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                        let dateKey = (emp.shifts && emp.shifts[k1] !== undefined) ? k1 : k2;
+                        let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
+                        
                         if (s === '例') leiCount++; 
                         if (s === '休') xiuCount++; 
                         if (s === '國') guoCount++;
                     }
-                    let reqGuo = int.reqGuo || 0;
                     
-                    // 📌 必須精準相等才是合格
-                    let isLeiOk = (leiCount === int.reqLei);
-                    let isXiuOk = (xiuCount === int.reqXiu);
-                    let isGuoOk = (guoCount === reqGuo);
+                    let isLeiOk = (reqLei === 0) || (leiCount === reqLei);
+                    let isXiuOk = (reqXiu === 0) || (xiuCount === reqXiu);
+                    let isGuoOk = (reqGuo === 0) || (guoCount === reqGuo);
 
-                    if(isLeiOk && isXiuOk && isGuoOk) {
-                        resultMsg += `  ✓ [${int.name}] 完美達標 (例:${leiCount}, 休:${xiuCount}, 國:${guoCount})\n`;
-                    } else {
-                        hasError = true;
-                        resultMsg += `  ❌ [${int.name}] 異常！排入(例:${leiCount}, 休:${xiuCount}, 國:${guoCount}) / 需求應為(例:${int.reqLei}, 休:${int.reqXiu}, 國:${reqGuo})\n`;
+                    if(!isLeiOk || !isXiuOk || !isGuoOk) {
+                        hasGlobalError = true;
+                        let errDetail = [];
+                        if (reqLei > 0 && leiCount !== reqLei) errDetail.push(`例需${reqLei}實排${leiCount}`);
+                        if (reqXiu > 0 && xiuCount !== reqXiu) errDetail.push(`休需${reqXiu}實排${xiuCount}`);
+                        if (reqGuo > 0 && guoCount !== reqGuo) errDetail.push(`國需${reqGuo}實排${guoCount}`);
+                        
+                        empErrors.push(`[${int.name}] ${errDetail.join(', ')}`);
+                        errorIntervals.push(int);
                     }
                 }); 
-                resultMsg += `\n`;
+
+                // 儲存該員工的檢核結果
+                validationResults[emp.uid] = {
+                    ok: empErrors.length === 0,
+                    errors: empErrors,
+                    errorIntervals: errorIntervals
+                };
             });
 
-            if (hasError) {
-                if (confirm(resultMsg + "\n檢測到假數不符！是否要執行【一鍵自動編譯例休國，多餘假自動補特休】？")) {
-                    autoFillOffDaysAndAL();
-                }
+            // 重新渲染班表，將會畫出 ✅ 或 ⚠️
+            renderSchedule();
+
+            if (hasGlobalError) {
+                showToast("⚠️ 檢測到異常！請點擊人員旁邊的【⚠️異常】按鈕查看。", 3000);
             } else {
-                alert(resultMsg + "🎉 太棒了！所有人員假數皆精準符合規定！");
+                showToast("🎉 完美！所有人員假數皆精準符合規定！", 3000);
             }
         }
 
-        // 💡 一鍵自動編譯 [例休國] 並將多餘空格/劃休補 [特]
+        // 💡 視覺優化版：在班表上 Highlight 錯誤區間 (使用半透明內陰影，保留原本底色)
+        function highlightErrors(empIdx) {
+            const emp = state.staff[empIdx];
+            const valData = validationResults[emp.id];
+            if(!valData || valData.ok) return;
+
+            // 1. 清除畫面上舊的 Highlight
+            document.querySelectorAll('.error-highlight').forEach(el => {
+                el.style.boxShadow = 'none';
+                el.classList.remove('error-highlight');
+            });
+
+            // 2. 針對該員工出錯的區間加上 15% 半透明紅底與紅框
+            valData.errorIntervals.forEach(int => {
+                for (let day = int.start; day <= int.end; day++) {
+                    let inputEl = document.getElementById(`shift-${empIdx}-${day}`);
+                    if (inputEl) {
+                        inputEl.classList.add('error-highlight');
+                        // 📌 核心修正：用 inset box-shadow 蓋上 15% 紅色，完全不破壞原本的 backgroundColor
+                        inputEl.style.boxShadow = 'inset 0 0 0 100px rgba(220, 53, 69, 0.15), inset 0 0 0 1.5px rgba(220, 53, 69, 0.8)';
+                    }
+                }
+            });
+
+            showCustomErrorModal(emp.name, valData.errors);
+        }
+
+        // 💡 建立一個優美的自訂錯誤提示視窗 (取代 alert)
+        function showCustomErrorModal(name, errors) {
+            let modal = document.getElementById('custom-error-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'custom-error-modal';
+                modal.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:9999; min-width:320px; font-family:sans-serif;';
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = `
+                <h4 style="color:#dc3545; margin-top:0; border-bottom:1px solid #eee; padding-bottom:10px;">⚠️ ${name} - 假數異常</h4>
+                <div style="margin-bottom: 20px; font-size:15px; line-height:1.6; color:#333;">
+                    ${errors.join('<br>')}
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button class="btn btn-secondary" onclick="document.getElementById('custom-error-modal').style.display='none'">我知道了</button>
+                    <button class="btn btn-warning" onclick="document.getElementById('custom-error-modal').style.display='none'; autoFillOffDaysAndAL();">⚡ 一鍵自動修復假別</button>
+                </div>
+            `;
+            modal.style.display = 'block';
+        }
+
+        // 💡 升級版 1：一鍵自動編譯 [例休國] (精準判斷 空窗期 與 核心區間)
         function autoFillOffDaysAndAL() {
             const dateVal = document.getElementById('schedule-month').value; 
-            let ints = state.intervals[dateVal] || [];
-            if(ints.length === 0) return alert('此月份尚未設定區間，無法自動編譯！');
-
             const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const altKey = `${year}-${month}`;
+            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
 
-            state.staff.forEach((emp, empIdx) => {
+            // 找到這行並替換：
+            if(ints.length === 0) return alert(`⚠️ 系統阻擋：無法自動編譯假別！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能依照規定為您精準轉譯。`);
+
+            state.staff.forEach(emp => {
                 if (!emp.shifts) emp.shifts = {};
 
+                let coveredDays = new Array(daysInMonth + 1).fill(false);
+                let totalReqGuo = 0;
+
+                // A. 找出「核心區間」(有規定例/休的日子)，剩下的就是「空窗期」
                 ints.forEach(int => {
-                    let curLei = 0, curXiu = 0, curGuo = 0;
-                    // 1. 統計現有天數
-                    for(let i = int.start; i <= int.end; i++) {
-                        let s = emp.shifts[`${year}-${month}-${i}`] || '';
-                        if (s === '例') curLei++;
-                        if (s === '休') curXiu++;
-                        if (s === '國') curGuo++;
+                    let rLei = Number(int.reqLei) || 0;
+                    let rXiu = Number(int.reqXiu) || 0;
+                    totalReqGuo += (Number(int.reqGuo) || 0);
+
+                    if (rLei > 0 || rXiu > 0) {
+                        for(let d = int.start; d <= int.end; d++) {
+                            if(d >= 1 && d <= daysInMonth) coveredDays[d] = true;
+                        }
+                    }
+                });
+
+                // B. 將手動劃的「休」全部暫存為「WILD」
+                for (let d = 1; d <= daysInMonth; d++) {
+                    let k1 = `${year}-${month}-${d}`;
+                    let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                    if (emp.shifts[dateKey] === '休') emp.shifts[dateKey] = 'WILD';
+                }
+
+                // C. 【第一階段：處理空窗期】順序：國 -> 事
+                let currentGuo = 0;
+                for (let d = 1; d <= daysInMonth; d++) {
+                    let k1 = `${year}-${month}-${d}`;
+                    let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                    if (emp.shifts[dateKey] === '國') currentGuo++;
+                }
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    if (!coveredDays[d]) { // 落在空窗期
+                        let k1 = `${year}-${month}-${d}`;
+                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                        
+                        if (emp.shifts[dateKey] === 'WILD') {
+                            if (currentGuo < totalReqGuo) {
+                                emp.shifts[dateKey] = '國';
+                                currentGuo++;
+                            } else {
+                                emp.shifts[dateKey] = '事'; // 沒有國定假日額度，強制變事假
+                            }
+                        }
+                    }
+                }
+
+                // D. 【第二階段：處理核心區間】順序：例 -> 休 -> 國 -> 特
+                const fillTarget = (targetChar, reqField) => {
+                    ints.forEach(int => {
+                        let req = Number(int[reqField]) || 0;
+                        if (req === 0) return;
+                        let current = 0; let availableWILDs = [];
+                        for (let d = int.start; d <= int.end; d++) {
+                            let k1 = `${year}-${month}-${d}`;
+                            let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                            if (emp.shifts[dateKey] === targetChar) current++;
+                            else if (emp.shifts[dateKey] === 'WILD') availableWILDs.push(dateKey);
+                        }
+                        while (current < req && availableWILDs.length > 0) {
+                            let dateKey = availableWILDs.shift();
+                            emp.shifts[dateKey] = targetChar;
+                            current++;
+                        }
+                    });
+                };
+
+                fillTarget('例', 'reqLei'); 
+                fillTarget('休', 'reqXiu'); 
+                fillTarget('國', 'reqGuo'); // 剩下的國補進核心區間
+
+                // 核心區間內，滿足例/休/國之後，多出來的假才變成「特」
+                for (let d = 1; d <= daysInMonth; d++) {
+                    if (coveredDays[d]) {
+                        let k1 = `${year}-${month}-${d}`;
+                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                        if (emp.shifts[dateKey] === 'WILD') {
+                            emp.shifts[dateKey] = '特';
+                        }
+                    }
+                }
+            });
+
+            validateDeformRules();
+        }
+
+        // 💡 升級版 2：一鍵最佳化排班 (同步加入空窗期自動判斷)
+        function autoOptimizeSchedule() {
+            const dateVal = document.getElementById('schedule-month').value; 
+            if (!dateVal) return alert("請先選擇排班年月！");
+
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const altKey = `${year}-${month}`;
+            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
+
+            // 找到這行並替換：
+            if (ints.length === 0) return alert(`⚠️ 系統阻擋：找不到變形工時設定，無法自動排班！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能替您進行合法的最佳化排班。`);
+            if (state.staff.length === 0) return alert("請先在人員設定中新增員工！");
+            if (state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
+
+            showLoading("正在進行排班最佳化與空窗期判定...");
+
+            setTimeout(() => {
+                state.staff.forEach(emp => {
+                    if (!emp.shifts) emp.shifts = {};
+
+                    let coveredDays = new Array(daysInMonth + 1).fill(false);
+                    let totalReqGuo = 0;
+
+                    ints.forEach(int => {
+                        let rLei = Number(int.reqLei) || 0;
+                        let rXiu = Number(int.reqXiu) || 0;
+                        totalReqGuo += (Number(int.reqGuo) || 0);
+                        if (rLei > 0 || rXiu > 0) {
+                            for(let d = int.start; d <= int.end; d++) {
+                                if(d >= 1 && d <= daysInMonth) coveredDays[d] = true;
+                            }
+                        }
+                    });
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        let k1 = `${year}-${month}-${d}`;
+                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                        if (emp.shifts[dateKey] === '休') emp.shifts[dateKey] = 'WILD';
                     }
 
-                    // 2. 針對此區間掃描，補足 [例] 與 [休]
-                    for(let i = int.start; i <= int.end; i++) {
-                        let dateKey = `${year}-${month}-${i}`;
-                        let s = emp.shifts[dateKey] || '';
+                    // 處理空窗期
+                    let currentGuo = 0;
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        let k1 = `${year}-${month}-${d}`;
+                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                        if (emp.shifts[dateKey] === '國') currentGuo++;
+                    }
 
-                        // 如果這天尚未確定假別，且額度未滿，優先填補
-                        if (['休', '例', '國', ''].includes(s)) {
-                            if (curLei < int.reqLei && s !== '例') {
-                                emp.shifts[dateKey] = '例'; curLei++;
-                            } else if (curXiu < int.reqXiu && s !== '休' && curLei >= int.reqLei) {
-                                emp.shifts[dateKey] = '休'; curXiu++;
-                            } else if (curLei >= int.reqLei && curXiu >= int.reqXiu && (s === '休' || s === '例')) {
-                                // 超出的例/休，自動轉為 [特]
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        if (!coveredDays[d]) {
+                            let k1 = `${year}-${month}-${d}`;
+                            let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                            if (emp.shifts[dateKey] === 'WILD') {
+                                if (currentGuo < totalReqGuo) {
+                                    emp.shifts[dateKey] = '國';
+                                    currentGuo++;
+                                } else {
+                                    emp.shifts[dateKey] = '事';
+                                }
+                            }
+                        }
+                    }
+
+                    // 處理核心區間
+                    const fillTarget = (targetChar, reqField) => {
+                        ints.forEach(int => {
+                            let req = Number(int[reqField]) || 0;
+                            if (req === 0) return;
+                            let current = 0; let availableWILDs = [];
+                            for (let d = int.start; d <= int.end; d++) {
+                                let k1 = `${year}-${month}-${d}`;
+                                let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                                if (emp.shifts[dateKey] === targetChar) current++;
+                                else if (emp.shifts[dateKey] === 'WILD') availableWILDs.push(dateKey);
+                            }
+                            while (current < req && availableWILDs.length > 0) {
+                                let dateKey = availableWILDs.shift();
+                                emp.shifts[dateKey] = targetChar;
+                                current++;
+                            }
+                        });
+                    };
+
+                    fillTarget('例', 'reqLei'); 
+                    fillTarget('休', 'reqXiu'); 
+                    fillTarget('國', 'reqGuo');
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        if (coveredDays[d]) {
+                            let k1 = `${year}-${month}-${d}`;
+                            let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                            if (emp.shifts[dateKey] === 'WILD') {
                                 emp.shifts[dateKey] = '特';
                             }
                         }
                     }
                 });
-            });
 
-            renderSchedule();
-            showToast("✨ 例休國與特休已自動編譯完成！");
-        }
+                // =========================================================================
+                // 📌 升級：空白格填補班別 (嚴格判斷「自動排班 = TRUE」且「職位符合」)
+                // =========================================================================
+                const multiSlotShifts = state.shiftMap.filter(m => {
+                    let k = (m.key || '').trim();
+                    if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k)) return false;
+                    
+                    // 💡 新增防線 1：檢查是否允許自動排班 (FALSE 就排除)
+                    if (m.autoAssign === false) return false; 
+                    
+                    let covers = (m.cover || '').split(',').map(x => x.trim()).filter(x => x !== '');
+                    return covers.length >= 2; 
+                });
 
-        // 💡 一鍵自動排班最佳化引擎
-        function autoOptimizeSchedule() {
-            const dateVal = document.getElementById('schedule-month').value;
-            const [year, month] = dateVal.split('-').map(Number);
-            const daysInMonth = new Date(year, month, 0).getDate();
+                if (multiSlotShifts.length === 0) {
+                    hideLoading();
+                    return alert("⚠️ 找不到【涵蓋時段 >= 2 個 且 允許自動排班】的可用班別！\n請至「班別對照表」檢查設定。");
+                }
 
-            if (state.staff.length === 0) return alert("請先在人員設定中新增員工！");
-            if (state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
-
-            showLoading("自動排班演算中，請稍候...");
-
-            setTimeout(() => {
-                // 針對當月每一天做人力填補
                 for (let day = 1; day <= daysInMonth; day++) {
-                    let dateKey = `${year}-${month}-${day}`;
-                    let d = new Date(year, month - 1, day).getDay();
-                    let reqIdx = (d === 0) ? 6 : d - 1; // 0是週日，對應陣列索引 6
+                    let k1 = `${year}-${month}-${day}`;
+                    let dWeek = new Date(year, month - 1, day).getDay();
+                    let reqIdx = (dWeek === 0) ? 6 : dWeek - 1; 
 
-                    // 遍歷每種人力需求 (如 A, B, C)
+                    let availableStaff = state.staff.filter(emp => {
+                        let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
+                        return s === ''; 
+                    });
+
+                    availableStaff.sort(() => Math.random() - 0.5);
+
                     state.manpower.forEach(mp => {
                         let targetReq = mp.reqs[reqIdx] || 0;
                         let cls = mp.class.toUpperCase();
-
-                        // 1. 計算當天該時段已有多少人出勤
                         let currentCount = 0;
+
                         state.staff.forEach(emp => {
-                            let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
-                            let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                            let s = emp.shifts[k1] || '';
+                            let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) 
+                                   || state.shiftMap.find(m => m.key === s);
                             if (map) {
                                 let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
                                 if (coveredSlots.includes(cls) || s.startsWith(cls)) currentCount++;
                             }
                         });
 
-                        // 2. 如果人數不足，尋找完全空白的員工填補
                         let needed = targetReq - currentCount;
-                        if (needed > 0) {
-                            // 尋找對應適合的班別 Key (優先找預設簡寫)
-                            let defaultShiftKey = (cls === 'A') ? 'AB' : (cls === 'B') ? 'BC' : (cls === 'C') ? 'BC' : 'D';
+                        while (needed > 0 && availableStaff.length > 0) {
+                            let emp = availableStaff.pop();
                             
-                            for (let emp of state.staff) {
-                                if (needed <= 0) break;
-                                if (!emp.shifts) emp.shifts = {};
+                            // 💡 新增防線 2：嚴格比對該員工的職位 (必須是自己的職位 或 通用)
+                            let matchedShifts = multiSlotShifts.filter(m => {
+                                let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
+                                return covers.includes(cls) && matchPos; // 職位與時段都必須吻合
+                            });
 
-                                // 如果該員工當天完全沒排班，自動幫他排入缺少的班別
-                                if (!emp.shifts[dateKey] || emp.shifts[dateKey].trim() === '') {
-                                    emp.shifts[dateKey] = defaultShiftKey;
-                                    needed--;
-                                }
+                            let fallbackShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                            
+                            let assignKey = '';
+                            if (matchedShifts.length > 0) {
+                                assignKey = matchedShifts[Math.floor(Math.random() * matchedShifts.length)].key;
+                            } else if (fallbackShifts.length > 0) {
+                                assignKey = fallbackShifts[Math.floor(Math.random() * fallbackShifts.length)].key;
                             }
+
+                            if (assignKey) emp.shifts[k1] = assignKey;
+                            needed--;
+                        }
+                    });
+
+                    // 零空白保底填補
+                    availableStaff.forEach(emp => {
+                        // 同樣嚴格檢查職位
+                        let validShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                        if(validShifts.length > 0) {
+                            let randomShift = validShifts[Math.floor(Math.random() * validShifts.length)].key;
+                            emp.shifts[k1] = randomShift;
                         }
                     });
                 }
 
                 renderSchedule();
                 hideLoading();
-                showToast("⚡ 自動最佳化排班完成！請進行檢查與微調。");
+                showToast("🎉 排班完成！空窗期與核心區間的假別已精準判定！");
             }, 300);
         }
-
+        // 💡 升級版：使用 SheetJS 產生飛騰系統完全相容的「真・Excel 檔案」
         function exportFeiTengExcel() {
             const dateVal = document.getElementById('schedule-month').value;
             const globalStore = document.getElementById('globalStore').value;
-            const sheetName = document.getElementById('sheetName').value || 'Sheet1';
+            const sheetName = document.getElementById('sheetName').value || 'ATT0020200';
             const [year, month] = dateVal.split('-').map(Number);
             const strMonth = month.toString().padStart(2, '0');
             const daysInMonth = new Date(year, month, 0).getDate();
 
-            let tableHtml = `<table border="1">`;
-            tableHtml += `<tr><td colspan="2" style="color:#0070c0;">請輸入排班年月,月份</td>`;
-            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="text-align:center;">${strMonth}</td>`;
-            tableHtml += `</tr><tr><td style="color:#217346; font-weight:bold; font-size:16px;">${year}</td><td style="color:#0070c0;">日期</td>`;
-            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="text-align:center;">${i}</td>`;
-            tableHtml += `</tr><tr><td style="color:#217346; font-weight:bold; font-size:16px;">${strMonth}</td><td style="color:#0070c0;">星期</td>`;
-            
+            // 準備裝載所有資料的二維陣列
+            let excelData = [];
+
+            // 第一列：請輸入排班年月,月份
+            let row1 = ['請輸入排班年月,月份', null]; // null 是為了合併儲存格留空
+            for(let i=1; i<=daysInMonth; i++) row1.push(strMonth);
+            excelData.push(row1);
+
+            // 第二列：年份與日期
+            let row2 = [year, '日期'];
+            for(let i=1; i<=daysInMonth; i++) row2.push(i);
+            excelData.push(row2);
+
+            // 第三列：月份與星期
+            let row3 = [strMonth, '星期'];
             for(let i=1; i<=daysInMonth; i++) {
                 let d = new Date(year, month-1, i).getDay();
-                let bg = (d === 0 || d === 6) ? 'background-color:#f4b084;' : ''; 
-                tableHtml += `<td style="text-align:center; ${bg}">${weekDays[d]}</td>`;
+                row3.push(weekDays[d]);
             }
-            tableHtml += `</tr><tr><td style="color:#0070c0;">排班人員</td><td style="color:#0070c0;">人員姓名</td>`;
-            for(let i=1; i<=daysInMonth; i++) tableHtml += `<td style="color:#a6a6a6; text-align:center; font-size:11px;">班別代碼</td>`;
-            tableHtml += `</tr>`;
+            excelData.push(row3);
 
+            // 第四列：表頭標題
+            let row4 = ['排班人員', '人員姓名'];
+            for(let i=1; i<=daysInMonth; i++) row4.push('班別代碼');
+            excelData.push(row4);
+
+            // 資料列：員工班表
             state.staff.forEach(emp => {
-                let row = `<tr><td>${emp.id}</td><td>${emp.name}(${globalStore})</td>`;
+                let row = [emp.id, `${emp.name}(${globalStore})`];
                 for(let i=1; i<=daysInMonth; i++) {
                     let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
                     let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
                     let code = map ? map.code : s;
-                    let style = code.includes(';H') ? 'color:red; font-weight:bold;' : ''; 
-                    row += `<td style="text-align:center; ${style}">${code}</td>`;
+                    row.push(code); // 直接填入純文字代碼
                 }
-                tableHtml += row + `</tr>`;
+                excelData.push(row);
             });
-            tableHtml += `</table>`;
 
-            let excelFile = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${sheetName}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>${tableHtml}</body></html>`;
+            // 建立虛擬工作簿與工作表
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
 
-            const blob = new Blob([excelFile], { type: 'application/vnd.ms-excel;charset=utf-8' });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-            link.download = `飛騰排班_${sheetName}_${year}${strMonth}.xls`; document.body.appendChild(link);
-            link.click(); document.body.removeChild(link);
+            // 處理第一列的合併儲存格 (A1:B1)
+            if (!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } });
+
+            // 📌 核心關鍵：將工作表命名為畫面上輸入的名稱 (如 ATT0020200)
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+            // 匯出真實的 .xlsx 檔案
+            const fileName = `${globalStore}-${year}${strMonth}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showToast(`✅ 已匯出真實 Excel 檔：${fileName}`);
         }
 
         window.onload = function() {
@@ -1125,6 +1573,61 @@ let shiftRow = `<tr>
                 // 重新渲染班表畫面
                 renderSchedule();
                 showToast(`🧹 已清空【${emp.name}】${month} 月的個人班表`);
+            }
+        }
+        // 💡 新增門市時同時設定密碼
+        function addNewStore() {
+            const newStoreName = prompt("請輸入新門市名稱（例如：蘆竹診所）：");
+            if (newStoreName && newStoreName.trim() !== "") {
+                const storeName = newStoreName.trim();
+                const newPwd = prompt(`請為【${storeName}】設定專用存取密碼：`, "1234");
+                
+                // 記錄密碼
+                storePasswords[storeName] = newPwd || "1234";
+
+                const storeSelect = document.getElementById('globalStore');
+                const exists = Array.from(storeSelect.options).some(opt => opt.value === storeName);
+                if (!exists) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = storeName;
+                    newOpt.innerText = storeName;
+                    storeSelect.appendChild(newOpt);
+                }
+
+                storeSelect.value = storeName;
+                loadFromCloud();
+            }
+        }
+        // 💡 點擊 [職位|組別]：一鍵清空該員「雙時段以上」的班別 (保留例休國特與備註)
+        function clearMultiSlotShifts(empIdx) {
+            const emp = state.staff[empIdx];
+            if (!emp || !emp.shifts) return;
+
+            const dateVal = document.getElementById('schedule-month').value;
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            const isConfirmed = confirm(`⚠️ 確定要清空【${emp.name}】在 ${month} 月的「雙時段以上班別」嗎？\n(例休國特等假別將會保留不動)`);
+            
+            if (isConfirmed) {
+                for (let i = 1; i <= daysInMonth; i++) {
+                    let k1 = `${year}-${month}-${i}`;
+                    let k2 = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                    let s = emp.shifts[dateKey] || '';
+                    
+                    // 找出該班別的設定
+                    let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) || state.shiftMap.find(m => m.key === s);
+                    if (map) {
+                        let covers = (map.cover || '').split(',').map(x => x.trim()).filter(x => x !== '');
+                        // 如果涵蓋時段 >= 2，就清空它
+                        if (covers.length >= 2) {
+                            emp.shifts[dateKey] = ''; 
+                        }
+                    }
+                }
+                renderSchedule();
+                showToast(`🧹 已保留假別，並清空【${emp.name}】的多時段班別`);
             }
         }
     </script>

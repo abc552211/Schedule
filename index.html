@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>排班與人力控管系統 - 完整修正版</title>
+    <title>排班與人力控管系統 - Firebase 版</title>
 
     <!-- 載入 html2canvas 套件 (用於一鍵班表截圖) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- 載入 Firebase 10.8.0 Compat SDK (最適合傳統 HTML/JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
         :root {
@@ -130,11 +134,11 @@
         <div style="display: flex; align-items: center; gap: 10px;">
             <label style="font-weight:bold;">套用門市:</label>
             <select id="globalStore" class="edit-input" style="width:130px; font-weight:bold; color:#0070c0;" onchange="loadFromCloud()">
-                <option value="南崁中正">載入中...</option>
+                <option value="南崁中正">南崁中正</option>
             </select>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
-            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Sheet</button>
+            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存 Firebase</button>
             <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰 Excel</button>
             <button class="btn btn-line" onclick="captureAndCopyForLine()">📸 截圖傳送到 LINE</button>
         </div>
@@ -155,6 +159,7 @@
                     <label><strong>選擇年月：</strong></label>
                     <input type="month" id="schedule-month" class="edit-input" onchange="renderSchedule()">
                     <button class="btn btn-warning" onclick="validateDeformRules()">依區間檢核工時</button>
+                    <button class="btn btn-primary" style="background-color: #6f42c1;" onclick="autoOptimizeSchedule()">⚡ 一鍵最佳化排班</button>
                     
                     <label style="margin-left:10px;"><strong>畫面縮放：</strong></label>
                     <select id="zoomSelect" class="edit-input" onchange="changeZoom(this.value)">
@@ -279,9 +284,7 @@
             <h3>四週變形工時區間與例休需求設定</h3>
             <div style="margin-bottom: 10px;">
                 <label><strong>選擇年月：</strong></label>
-                <select id="deformYear" class="edit-input" onchange="renderIntervals()">
-                    <!-- 選項將由 JavaScript 動態生成 (包含今年與明後年) -->
-                </select>
+                <select id="deformYear" class="edit-input" onchange="renderIntervals()"></select>
                 <select id="deformMonth" class="edit-input" onchange="renderIntervals()">
                     <option value="01">1 月</option>
                     <option value="02">2 月</option>
@@ -322,23 +325,35 @@
     <div id="toast">訊息提示</div>
 
     <script>
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwZODHweWlDZyShmq17anE6UdoZU2wZMpgVZQVjksZBIUqD7U9n5cUKEIDSaxIL7oYdTg/exec";
+        // 📌 請確認 projectId 是 schedule-af3b6 (新專案)
+        const firebaseConfig = {
+            apiKey: "AIzaSyA-z6EDaaTxhbljNVfEDRLbFAES6PNmgvY",
+            authDomain: "schedule-af3b6.firebaseapp.com",
+            projectId: "schedule-af3b6",
+            storageBucket: "schedule-af3b6.firebasestorage.app",
+            messagingSenderId: "183563119791",
+            appId: "1:183563119791:web:de425a175d0bd911b8785a",
+            measurementId: "G-8YJ0BPLD5Y"
+        };
 
-        let state = { stores: [], staff: [], shiftMap: [], manpower: [], intervals: {}, dailyNotes: {} };
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let state = { stores: ["南崁中正"], staff: [], shiftMap: [], manpower: [], intervals: {}, dailyNotes: {} };
         const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
         function switchTab(tabId, element) {
-    document.querySelectorAll('.tab-page').forEach(page => page.classList.remove('active'));
-    document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    element.classList.add('active');
+            document.querySelectorAll('.tab-page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            element.classList.add('active');
 
-    // 💡 點切換頁籤時：先將「選擇年月」強制同步給變形工時選單，再進行表格繪製
-    if (tabId === 'tab-deform') {
-        syncDeformMonthWithSchedule();
-        renderIntervals();
-    }
-}
+            if (tabId === 'tab-deform') {
+                syncDeformMonthWithSchedule();
+                renderIntervals();
+            }
+        }
 
         function showLoading(msg = "資料處理中，請稍候...") {
             document.getElementById('loadingText').innerText = msg;
@@ -359,38 +374,35 @@
             const yyyy = now.getFullYear();
             const mm = String(now.getMonth() + 1).padStart(2, '0');
             
-            // 1. 設定班表年月為當下年月
             document.getElementById('schedule-month').value = `${yyyy}-${mm}`;
             
-            // 2. 動態產生變形工時的年份選單 (前一年 ~ 後兩年)，解決無法選擇下一年度的問題
             const yearSelect = document.getElementById('deformYear');
             yearSelect.innerHTML = '';
             for (let i = yyyy - 1; i <= yyyy + 2; i++) {
                 yearSelect.innerHTML += `<option value="${i}">${i} 年</option>`;
             }
             
-            // 3. 設定變形工時年月選單為當下年月
             yearSelect.value = yyyy;
             document.getElementById('deformMonth').value = mm;
         }
 
         function syncDeformMonthWithSchedule() {
-    const schedMonthVal = document.getElementById('schedule-month').value; // 例: "2026-09"
-    if (schedMonthVal) {
-        const [yyyy, mm] = schedMonthVal.split('-');
-        const formattedMM = String(mm).padStart(2, '0');
-        
-        const yearSelect = document.getElementById('deformYear');
-        const monthSelect = document.getElementById('deformMonth');
+            const schedMonthVal = document.getElementById('schedule-month').value;
+            if (schedMonthVal) {
+                const [yyyy, mm] = schedMonthVal.split('-');
+                const formattedMM = String(mm).padStart(2, '0');
+                
+                const yearSelect = document.getElementById('deformYear');
+                const monthSelect = document.getElementById('deformMonth');
 
-        if (!Array.from(yearSelect.options).some(opt => opt.value === yyyy)) {
-            yearSelect.innerHTML += `<option value="${yyyy}">${yyyy} 年</option>`;
+                if (!Array.from(yearSelect.options).some(opt => opt.value === yyyy)) {
+                    yearSelect.innerHTML += `<option value="${yyyy}">${yyyy} 年</option>`;
+                }
+                
+                yearSelect.value = yyyy;
+                monthSelect.value = formattedMM;
+            }
         }
-        
-        yearSelect.value = yyyy;
-        monthSelect.value = formattedMM;
-    }
-}
 
         function updateDailyNote(dateKey, val) {
             if (!state.dailyNotes) state.dailyNotes = {};
@@ -430,87 +442,118 @@
             link.click();
         }
 
+        // 💡 修正版 loadFromCloud：修復 docSnap.exists 屬性寫法
         async function loadFromCloud() {
-            const storeSelect = document.getElementById('globalStore');
-            const currentStore = storeSelect.value || "";
-            const currentMonth = document.getElementById('schedule-month').value;
-
-            showLoading(`正在讀取【${currentStore || "門市"}】雲端資料...`);
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            showLoading(`正在從 Firebase 讀取【${activeStore}】資料...`);
 
             try {
-                let url = `${GAS_API_URL}?storeKey=${encodeURIComponent(currentStore)}&monthKey=${encodeURIComponent(currentMonth)}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                applyDataToState(data, currentStore);
-                showToast(`【${currentStore}】資料載入完成！`);
+                const docRef = db.collection("stores").doc(activeStore);
+                const docSnap = await docRef.get();
+
+                // 📌【關鍵修復】：Compat 版中 exists 是屬性 (docSnap.exists)，不要加括號 ()
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    applyDataToState(data, activeStore);
+                    showToast(`【${activeStore}】Firebase 資料載入成功！`);
+                } else {
+                    applyDataToState({}, activeStore);
+                    showToast(`【${activeStore}】為新門市，請開始排班並儲存`);
+                }
             } catch (err) {
-                alert("讀取 Google Sheet 資料失敗：" + err);
+                console.error("Firebase 讀取失敗:", err);
+                alert("讀取 Firebase 資料失敗：" + err.message);
             } finally {
                 hideLoading();
             }
         }
 
+        // 💡 同步寫入 Firebase Firestore
         async function saveToCloud() {
-            const activeStore = document.getElementById('globalStore').value;
-            showLoading(`正在將【${activeStore}】同步寫入 Google Sheet...`);
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            showLoading(`正在將【${activeStore}】寫入 Firebase...`);
+
+            let scheduleShifts = {};
+            let scheduleRemarks = {};
+            state.staff.forEach(emp => {
+                scheduleShifts[emp.id] = emp.shifts || {};
+                scheduleRemarks[emp.id] = emp.remarks || {};
+            });
 
             const payload = {
-                storeKey: activeStore, 
-                staff: state.staff, 
+                storeKey: activeStore,
+                staff: state.staff,
                 shiftMap: state.shiftMap,
-                manpower: state.manpower, 
-                intervals: state.intervals, 
-                schedule: { staff: state.staff },
-                dailyNotes: state.dailyNotes
+                manpower: state.manpower,
+                intervals: state.intervals,
+                dailyNotes: state.dailyNotes,
+                schedule: { shifts: scheduleShifts, remarks: scheduleRemarks },
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
             try {
-                const res = await fetch(GAS_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload)
-                });
-                showToast(`【${activeStore}】資料已成功寫入 Google Sheet！`);
+                await db.collection("stores").doc(activeStore).set(payload, { merge: true });
+                showToast(`【${activeStore}】成功儲存至 Firebase！`);
             } catch (err) {
-                showToast(`【${activeStore}】資料寫入完成！`);
+                console.error("Firebase 儲存失敗:", err);
+                alert("儲存至 Firebase 失敗：" + err.message);
             } finally {
                 hideLoading();
             }
         }
 
         function applyDataToState(data, activeStore) {
-    const storeSelect = document.getElementById('globalStore');
-    if (data.stores && data.stores.length > 0) {
-        state.stores = data.stores;
-        state.dailyNotes = data.dailyNotes || {};
-        let selected = activeStore || data.stores[0];
-        storeSelect.innerHTML = data.stores.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
-    }
+            const storeSelect = document.getElementById('globalStore');
+            if (data.stores && data.stores.length > 0) {
+                state.stores = data.stores;
+                let selected = activeStore || data.stores[0];
+                storeSelect.innerHTML = data.stores.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+            }
 
-    state.staff = data.staff || [];
-    state.shiftMap = data.shiftMap || [];
-    state.manpower = data.manpower || [];
-    
-    // 💡 確保 intervals 正確寫入 state
-    state.intervals = data.intervals || {};
+            state.staff = data.staff || [];
+            state.shiftMap = data.shiftMap || [];
+            state.manpower = data.manpower || [];
+            state.intervals = data.intervals || {};
+            state.dailyNotes = data.dailyNotes || {};
 
-    if (data.schedule) {
-        state.staff.forEach(emp => {
-            emp.shifts = (data.schedule.shifts && data.schedule.shifts[emp.id]) ? data.schedule.shifts[emp.id] : {};
-            emp.remarks = (data.schedule.remarks && data.schedule.remarks[emp.id]) ? data.schedule.remarks[emp.id] : {};
-        });
-    }
+            if (data.schedule) {
+                state.staff.forEach(emp => {
+                    emp.shifts = {};
+                    emp.remarks = {};
 
-    // 💡 載入資料後，依序渲染各分頁
-    renderShiftCodes(); 
-    renderStaff(); 
-    renderManpower(); 
-    
-    // 先同步年月選單，再繪製變形工時與班表
-    syncDeformMonthWithSchedule();
-    renderIntervals(); 
-    renderSchedule();
-}
+                    const rawShifts = (data.schedule.shifts && data.schedule.shifts[emp.id]) ? data.schedule.shifts[emp.id] : {};
+                    const rawRemarks = (data.schedule.remarks && data.schedule.remarks[emp.id]) ? data.schedule.remarks[emp.id] : {};
+
+                    Object.keys(rawShifts).forEach(dKey => {
+                        let parts = String(dKey).split('-');
+                        if (parts.length === 3) {
+                            let normKey = `${Number(parts[0])}-${Number(parts[1])}-${Number(parts[2])}`;
+                            emp.shifts[normKey] = rawShifts[dKey];
+                        } else {
+                            emp.shifts[dKey] = rawShifts[dKey];
+                        }
+                    });
+
+                    Object.keys(rawRemarks).forEach(dKey => {
+                        let parts = String(dKey).split('-');
+                        if (parts.length === 3) {
+                            let normKey = `${Number(parts[0])}-${Number(parts[1])}-${Number(parts[2])}`;
+                            emp.remarks[normKey] = rawRemarks[dKey];
+                        } else {
+                            emp.remarks[dKey] = rawRemarks[dKey];
+                        }
+                    });
+                });
+            }
+
+            renderShiftCodes(); 
+            renderStaff(); 
+            renderManpower(); 
+            
+            syncDeformMonthWithSchedule();
+            renderIntervals(); 
+            renderSchedule();
+        }
 
         function renderQuickRef() {
             const container = document.getElementById('quickRefContainer');
@@ -523,7 +566,6 @@
                 displayShifts.map(m => `<div class="ref-btn" style="color:${m.textColor}; background-color:${m.bgColor};" onclick="copyToClipboard('${m.key}')" title="點擊複製 ${m.key}">${m.key}</div>`).join('');
         }
 
-        // --- 排班表動態渲染 ---
         function renderSchedule() {
             const dateVal = document.getElementById('schedule-month').value;
             const [year, month] = dateVal.split('-').map(Number);
@@ -551,7 +593,6 @@
 
             let thead = document.getElementById('scheduleHead');
             
-            // 1. 人力提示列
             let alertRow = '';
             if (showAlert) {
                 alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
@@ -583,14 +624,12 @@
                 alertRow += `</tr>`;
             }
 
-            // 列1：提醒警語列
             let row1 = `<tr style="background-color: #fff3cd; color: #856404; font-weight: bold; font-size: 11px;">
                 <td colspan="${1 + daysInMonth + extraColCount}" style="text-align: left; padding: 4px 8px;">
                     ⚠️ 下班時間或休息時間到請離開工作崗位，勿未經同意自行加班
                 </td>
             </tr>`;
 
-            // 列2：每日備註列
             let row2 = `<tr style="background-color: #f9f9f9;">
                 <td class="name-col" style="font-size: 11px; font-weight: bold; color: #555;">備註</td>`;
             for(let i=1; i<=daysInMonth; i++) {
@@ -603,7 +642,6 @@
             if (extraColCount > 0) row2 += `<td colspan="${extraColCount}"></td>`;
             row2 += `</tr>`;
 
-            // 日期列與星期列
             let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000;">${formattedMonthStr}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
@@ -629,10 +667,11 @@
             state.staff.forEach((emp, empIdx) => {
                 let realOff = 0, usedAL = 0, earnedOT = 0;
                 
-                let nameCellHtml = `<strong>${emp.name}</strong><br><span style="font-size:10px; color:#666; font-weight:normal;">${emp.group} | ${emp.pos}</span>`;
+                // 💡 修改後的寫法：點擊姓名觸發清空，並加上提示與 hover 效果
+let nameCellHtml = `<strong style="cursor: pointer; color: #0d6efd;" onclick="clearStaffShifts(${empIdx})" title="💡 點擊可一鍵清空 ${emp.name} 當月班表">${emp.name}</strong><br><span style="font-size:10px; color:#666; font-weight:normal;">${emp.group} | ${emp.pos}</span>`;
 
-                let shiftRow = `<tr>
-                    <td rowspan="2" class="name-col" style="background:#fff; line-height:1.2; padding:2px;">${nameCellHtml}</td>`;
+let shiftRow = `<tr>
+    <td rowspan="2" class="name-col" style="background:#fff; line-height:1.2; padding:2px;">${nameCellHtml}</td>`;
                 
                 let remarkRow = `<tr>`;
 
@@ -672,7 +711,6 @@
                 tbody.innerHTML += shiftRow + remarkRow;
             });
 
-            // 出勤總人數 (A出勤、B出勤、C出勤)
             let tfoot = document.getElementById('scheduleFoot');
             let classesToCount = ['A', 'B', 'C'];
             let footHtml = '';
@@ -810,25 +848,18 @@
         }
         function delStaff(idx) { state.staff.splice(idx, 1); renderStaff(); renderSchedule(); }
 
-        // 💡 強制讓 Key 無論月份有沒有補 0 都能正確對齊 (例: 2026-08)
-function getCurrentIntervalKey() { 
-    const y = document.getElementById('deformYear').value;
-    const m = String(document.getElementById('deformMonth').value).padStart(2, '0'); // 補零成 08
-    return `${y}-${m}`; 
-}
+        function getCurrentIntervalKey() { 
+            const y = document.getElementById('deformYear').value;
+            const m = String(document.getElementById('deformMonth').value).padStart(2, '0');
+            return `${y}-${m}`; 
+        }
 
-// 💡 升級版 renderIntervals：支援雙重 Key 搜尋防呆 (相容 "2026-8" 與 "2026-08")
         function renderIntervals() {
-            const key = getCurrentIntervalKey(); // 例如 "2026-08"
-            
-            // 【修正重點】：將選單取到的值轉為數字，確實去掉開頭的 0，才能正確產生 "2026-8"
+            const key = getCurrentIntervalKey();
             const rawM = Number(document.getElementById('deformMonth').value); 
-            const altKey = `${document.getElementById('deformYear').value}-${rawM}`; // 例如 "2026-8"
+            const altKey = `${document.getElementById('deformYear').value}-${rawM}`;
 
-            // 防呆搜尋：優先拿 2026-08，拿不到就拿 2026-8
             let list = state.intervals[key] || state.intervals[altKey] || [];
-            
-            // 將正確的資料列賦值回標準 key
             state.intervals[key] = list;
 
             const tbody = document.getElementById('intervalsBody');
@@ -858,26 +889,155 @@ function getCurrentIntervalKey() {
         }
         function delInterval(key, idx) { state.intervals[key].splice(idx, 1); renderIntervals(); }
         
+        // 💡 升級版：精準檢核變形工時 (必須剛好等於，不能多也不能少)
         function validateDeformRules() {
-            const dateVal = document.getElementById('schedule-month').value; let ints = state.intervals[dateVal] || [];
+            const dateVal = document.getElementById('schedule-month').value; 
+            let ints = state.intervals[dateVal] || [];
             if(ints.length === 0) return alert('此月份尚未設定任何變形工時區間！');
-            const [year, month] = dateVal.split('-').map(Number); let resultMsg = `【${month}月份區間檢核結果】\n\n`;
+            
+            const [year, month] = dateVal.split('-').map(Number); 
+            let resultMsg = `【${month}月份區間精準檢核結果】\n\n`;
+            let hasError = false;
+
             state.staff.forEach(emp => {
                 resultMsg += `>> ${emp.name} (${emp.pos})\n`;
                 ints.forEach(int => {
                     let leiCount = 0, xiuCount = 0, guoCount = 0;
                     for(let i = int.start; i <= int.end; i++) {
                         let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
-                        if (s === '例') leiCount++; if (s === '休') xiuCount++; if (s === '國') guoCount++;
+                        if (s === '例') leiCount++; 
+                        if (s === '休') xiuCount++; 
+                        if (s === '國') guoCount++;
                     }
                     let reqGuo = int.reqGuo || 0;
-                    if(leiCount >= int.reqLei && xiuCount >= int.reqXiu && guoCount >= reqGuo) {
-                        resultMsg += `  ✓ [${int.name}] 達標\n`;
+                    
+                    // 📌 必須精準相等才是合格
+                    let isLeiOk = (leiCount === int.reqLei);
+                    let isXiuOk = (xiuCount === int.reqXiu);
+                    let isGuoOk = (guoCount === reqGuo);
+
+                    if(isLeiOk && isXiuOk && isGuoOk) {
+                        resultMsg += `  ✓ [${int.name}] 完美達標 (例:${leiCount}, 休:${xiuCount}, 國:${guoCount})\n`;
                     } else {
-                        resultMsg += `  ❌ [${int.name}] 違規！排入(例:${leiCount}, 休:${xiuCount}, 國:${guoCount}) / 需求(例:${int.reqLei}, 休:${int.reqXiu}, 國:${reqGuo})\n`;
+                        hasError = true;
+                        resultMsg += `  ❌ [${int.name}] 異常！排入(例:${leiCount}, 休:${xiuCount}, 國:${guoCount}) / 需求應為(例:${int.reqLei}, 休:${int.reqXiu}, 國:${reqGuo})\n`;
                     }
-                }); resultMsg += `\n`;
-            }); alert(resultMsg);
+                }); 
+                resultMsg += `\n`;
+            });
+
+            if (hasError) {
+                if (confirm(resultMsg + "\n檢測到假數不符！是否要執行【一鍵自動編譯例休國，多餘假自動補特休】？")) {
+                    autoFillOffDaysAndAL();
+                }
+            } else {
+                alert(resultMsg + "🎉 太棒了！所有人員假數皆精準符合規定！");
+            }
+        }
+
+        // 💡 一鍵自動編譯 [例休國] 並將多餘空格/劃休補 [特]
+        function autoFillOffDaysAndAL() {
+            const dateVal = document.getElementById('schedule-month').value; 
+            let ints = state.intervals[dateVal] || [];
+            if(ints.length === 0) return alert('此月份尚未設定區間，無法自動編譯！');
+
+            const [year, month] = dateVal.split('-').map(Number);
+
+            state.staff.forEach((emp, empIdx) => {
+                if (!emp.shifts) emp.shifts = {};
+
+                ints.forEach(int => {
+                    let curLei = 0, curXiu = 0, curGuo = 0;
+                    // 1. 統計現有天數
+                    for(let i = int.start; i <= int.end; i++) {
+                        let s = emp.shifts[`${year}-${month}-${i}`] || '';
+                        if (s === '例') curLei++;
+                        if (s === '休') curXiu++;
+                        if (s === '國') curGuo++;
+                    }
+
+                    // 2. 針對此區間掃描，補足 [例] 與 [休]
+                    for(let i = int.start; i <= int.end; i++) {
+                        let dateKey = `${year}-${month}-${i}`;
+                        let s = emp.shifts[dateKey] || '';
+
+                        // 如果這天尚未確定假別，且額度未滿，優先填補
+                        if (['休', '例', '國', ''].includes(s)) {
+                            if (curLei < int.reqLei && s !== '例') {
+                                emp.shifts[dateKey] = '例'; curLei++;
+                            } else if (curXiu < int.reqXiu && s !== '休' && curLei >= int.reqLei) {
+                                emp.shifts[dateKey] = '休'; curXiu++;
+                            } else if (curLei >= int.reqLei && curXiu >= int.reqXiu && (s === '休' || s === '例')) {
+                                // 超出的例/休，自動轉為 [特]
+                                emp.shifts[dateKey] = '特';
+                            }
+                        }
+                    }
+                });
+            });
+
+            renderSchedule();
+            showToast("✨ 例休國與特休已自動編譯完成！");
+        }
+
+        // 💡 一鍵自動排班最佳化引擎
+        function autoOptimizeSchedule() {
+            const dateVal = document.getElementById('schedule-month').value;
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            if (state.staff.length === 0) return alert("請先在人員設定中新增員工！");
+            if (state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
+
+            showLoading("自動排班演算中，請稍候...");
+
+            setTimeout(() => {
+                // 針對當月每一天做人力填補
+                for (let day = 1; day <= daysInMonth; day++) {
+                    let dateKey = `${year}-${month}-${day}`;
+                    let d = new Date(year, month - 1, day).getDay();
+                    let reqIdx = (d === 0) ? 6 : d - 1; // 0是週日，對應陣列索引 6
+
+                    // 遍歷每種人力需求 (如 A, B, C)
+                    state.manpower.forEach(mp => {
+                        let targetReq = mp.reqs[reqIdx] || 0;
+                        let cls = mp.class.toUpperCase();
+
+                        // 1. 計算當天該時段已有多少人出勤
+                        let currentCount = 0;
+                        state.staff.forEach(emp => {
+                            let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
+                            let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                            if (map) {
+                                let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                if (coveredSlots.includes(cls) || s.startsWith(cls)) currentCount++;
+                            }
+                        });
+
+                        // 2. 如果人數不足，尋找完全空白的員工填補
+                        let needed = targetReq - currentCount;
+                        if (needed > 0) {
+                            // 尋找對應適合的班別 Key (優先找預設簡寫)
+                            let defaultShiftKey = (cls === 'A') ? 'AB' : (cls === 'B') ? 'BC' : (cls === 'C') ? 'BC' : 'D';
+                            
+                            for (let emp of state.staff) {
+                                if (needed <= 0) break;
+                                if (!emp.shifts) emp.shifts = {};
+
+                                // 如果該員工當天完全沒排班，自動幫他排入缺少的班別
+                                if (!emp.shifts[dateKey] || emp.shifts[dateKey].trim() === '') {
+                                    emp.shifts[dateKey] = defaultShiftKey;
+                                    needed--;
+                                }
+                            }
+                        }
+                    });
+                }
+
+                renderSchedule();
+                hideLoading();
+                showToast("⚡ 自動最佳化排班完成！請進行檢查與微調。");
+            }, 300);
         }
 
         function exportFeiTengExcel() {
@@ -927,12 +1087,46 @@ function getCurrentIntervalKey() {
 
         window.onload = function() {
             setDefaultComputerMonth();
-            if(!GAS_API_URL || GAS_API_URL.includes("AKfycbx...")) {
-                alert("請記得將代碼中的 GAS_API_URL 替換為您部署後獲得的網址！");
-            } else {
-                loadFromCloud();
-            }
+            loadFromCloud();
+
+            // 💡 監聽按 Delete 鍵清空格子的功能
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Delete' && document.activeElement && document.activeElement.classList.contains('cell-input')) {
+                    document.activeElement.value = '';
+                    // 觸發 onchange 事件以更新資料
+                    document.activeElement.dispatchEvent(new Event('change'));
+                }
+            });
         };
+
+        // 💡 點擊員工姓名：一鍵清空個人當月班表與備註 (含確認提示)
+        function clearStaffShifts(empIdx) {
+            const emp = state.staff[empIdx];
+            if (!emp) return;
+
+            const dateVal = document.getElementById('schedule-month').value;
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            // 彈出確認視窗，避免誤觸
+            const isConfirmed = confirm(`⚠️ 確定要清空【${emp.name}】在 ${year} 年 ${month} 月的所有班表與備註嗎？`);
+            
+            if (isConfirmed) {
+                if (!emp.shifts) emp.shifts = {};
+                if (!emp.remarks) emp.remarks = {};
+
+                // 僅清空當選定月份的日期 Key
+                for (let i = 1; i <= daysInMonth; i++) {
+                    let dateKey = `${year}-${month}-${i}`;
+                    delete emp.shifts[dateKey];
+                    delete emp.remarks[dateKey];
+                }
+
+                // 重新渲染班表畫面
+                renderSchedule();
+                showToast(`🧹 已清空【${emp.name}】${month} 月的個人班表`);
+            }
+        }
     </script>
 </body>
 </html>

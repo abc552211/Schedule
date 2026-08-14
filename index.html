@@ -175,14 +175,13 @@
         <h2 id="systemTitle" style="margin: 0; font-size: 18px;">排班與人力控管系統 - 南崁中正</h2>
         <div style="display: flex; align-items: center; gap: 10px;">
             <label style="font-weight:bold;">套用門市:</label>
-<!-- 💡 顯示當前店家類別標籤 -->
 <span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
 <select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
     <option value="南崁中正">南崁中正</option>
 </select>
 <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
 <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="addNewStore('xup69512369')">➕ 新增門市</button>
-<!-- 💡 新增：修改店家類別按鈕 -->
+<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()">🔑 改密碼</button>
 <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">

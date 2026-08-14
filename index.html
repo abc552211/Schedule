@@ -485,8 +485,8 @@
 
         // 💡 升級版：高畫質、終極防截斷、自訂人力提示與靜默下載
         async function captureAndCopyForLine() {
-            // 📌 1. 下載前詢問：是否要顯示人力提示？
-            const includeAlert = confirm("截圖是否要包含上方的【人力提示】？\n(按「確定」保留，按「取消」隱藏)");
+            // 📌 1. 下載前詢問：按「確定(是)」隱藏，按「取消(否)」顯示
+            const hideAlert = confirm("截圖是否要【隱藏】上方的【人力提示】？\n\n・按「確定」：隱藏人力提示\n・按「取消」：顯示人力提示");
             
             showLoading("正在生成高畫質班表截圖...");
             const tableElement = document.getElementById('scheduleTable');
@@ -501,7 +501,8 @@
             document.querySelectorAll('.val-icon').forEach(el => el.style.display = 'none');
             const alertRow = document.querySelector('.alert-row');
             const origAlertDisplay = alertRow ? alertRow.style.display : '';
-            if (!includeAlert && alertRow) alertRow.style.display = 'none';
+            // 若選擇確定 (hideAlert === true)，則隱藏人力提示列
+            if (hideAlert && alertRow) alertRow.style.display = 'none';
 
             const originalOverflow = scrollWrapper ? scrollWrapper.style.overflowX : '';
             if (scrollWrapper) scrollWrapper.style.overflowX = 'visible'; 
@@ -981,6 +982,33 @@
             let classesToCount = ['A', 'B', 'C'];
             let footHtml = '';
 
+            // 💡 1. 產生底部「日期 (1~31)」列
+            let footDateRow = `<tr class="header-date-row" style="border-top: 2px solid #aaa;">
+                <th class="name-col" style="font-size:12px; font-weight:bold; background-color: var(--date-bg) !important; color:#333;">日期</th>`;
+            
+            // 💡 2. 產生底部「星期 (六日一...)」列
+            let footDayRow = `<tr class="header-week-row">
+                <th class="name-col" style="font-size:12px; font-weight:bold; background-color: var(--week-bg) !important; color:#1b5e20;">星期</th>`;
+
+            for(let i = 1; i <= daysInMonth; i++) {
+                let d = new Date(year, month - 1, i).getDay();
+                let dayClass = (d === 0) ? 'day-sun' : (d === 6) ? 'day-sat' : '';
+                
+                footDateRow += `<th class="day-col ${dayClass}" style="background-color: var(--date-bg) !important;">${i}</th>`;
+                footDayRow += `<th class="day-col ${dayClass}" style="background-color: var(--week-bg) !important;">${weekDays[d]}</th>`;
+            }
+
+            if (extraColCount > 0) {
+                footDateRow += `<th colspan="${extraColCount}" style="background-color: var(--date-bg) !important;"></th>`;
+                footDayRow += `<th colspan="${extraColCount}" style="background-color: var(--week-bg) !important;"></th>`;
+            }
+            footDateRow += `</tr>`;
+            footDayRow += `</tr>`;
+
+            // 先放入「日期」與「星期」兩列
+            footHtml += footDateRow + footDayRow;
+
+            // 💡 3. 接續產生 A出勤、B出勤、C出勤 統計數據
             classesToCount.forEach(cls => {
                 footHtml += `<tr style="background-color: var(--stat-bg); font-weight: bold; border-top: 1px solid #ccc;">
                     <td class="name-col" style="text-align:left; padding-left:4px;">${cls}出勤</td>`;
@@ -1012,6 +1040,7 @@
                 }
                 footHtml += `</tr>`;
             });
+
             tfoot.innerHTML = footHtml;
             
             renderQuickRef();

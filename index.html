@@ -137,15 +137,18 @@
     </div>
 
     <div class="top-navbar">
-        <h2 style="margin: 0; font-size: 18px;">排班與人力控管系統</h2>
+        <h2 id="systemTitle" style="margin: 0; font-size: 18px;">排班與人力控管系統 - 南崁中正</h2>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <!-- 修改後的寫法：加入新增門市按鈕 -->
-<label style="font-weight:bold;">套用門市:</label>
-<select id="globalStore" class="edit-input" style="width:120px; font-weight:bold; color:#0070c0;">
+            <label style="font-weight:bold;">套用門市:</label>
+<!-- 💡 顯示當前店家類別標籤 -->
+<span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
+<select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;">
     <option value="南崁中正">南崁中正</option>
 </select>
 <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
-<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 8px;" onclick="addNewStore('8888')">➕ 新增門市</button>
+<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="addNewStore('xup69512369')">➕ 新增門市</button>
+<!-- 💡 新增：修改店家類別按鈕 -->
+<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
             <button class="btn btn-primary" onclick="saveToCloud()">同步儲存</button>
@@ -297,32 +300,40 @@
         <!-- 5. 四週變形工時 -->
         <div id="tab-deform" class="tab-page">
             <h3>四週變形工時區間與例休需求設定</h3>
-            <div style="margin-bottom: 10px;">
-                <label><strong>選擇年月：</strong></label>
-                <select id="deformYear" class="edit-input" onchange="renderIntervals()"></select>
-                <select id="deformMonth" class="edit-input" onchange="renderIntervals()">
-                    <option value="01">1 月</option>
-                    <option value="02">2 月</option>
-                    <option value="03">3 月</option>
-                    <option value="04">4 月</option>
-                    <option value="05">5 月</option>
-                    <option value="06">6 月</option>
-                    <option value="07">7 月</option>
-                    <option value="08" selected>8 月</option>
-                    <option value="09">9 月</option>
-                    <option value="10">10 月</option>
-                    <option value="11">11 月</option>
-                    <option value="12">12 月</option>
+            <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <!-- 💡 新增：大類別選擇 (門市 / 診所) -->
+                <label style="font-weight: bold;">機構類別:</label>
+                <select id="deformCategory" class="edit-input" style="width: 100px; font-weight: bold; color: #0070c0;" onchange="renderIntervals()">
+                    <option value="門市">門市</option>
+                    <option value="診所">診所</option>
                 </select>
+
+                <label style="margin-left: 10px;"><strong>選擇年月：</strong></label>
+                <select id="deformYear" class="edit-input" style="width: 80px;" onchange="renderIntervals()"></select>
+                <select id="deformMonth" class="edit-input" style="width: 60px;" onchange="renderIntervals()">
+                    <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+                    <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+                    <option value="07">7 月</option><option value="08" selected>8 月</option><option value="09">9 月</option>
+                    <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+                </select>
+
+                <!-- 💡 新增：南崁中正限定功能按鈕區 -->
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="downloadDeformTemplate()">📥 下載空白範本(南崁中正限定)</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('deformExcelInput').click()">📤 匯入設定(南崁中正限定)</button>
+                    <input type="file" id="deformExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importDeformExcel(event)">
+                </div>
             </div>
+
             <div class="card">
                 <table style="width: auto;">
                     <thead>
-                        <tr><th>區間名稱</th><th>開始日期(1~31)</th><th>結束日期</th><th>應有【例】假數</th><th>應有【休】假數</th><th>應有【國】假數</th><th>操作</th></tr>
+                        <tr><th>適用類別</th><th>區間名稱</th><th>開始日期(1~31)</th><th>結束日期</th><th>應有【例】假數</th><th>應有【休】假數</th><th>應有【國】假數</th><th>操作</th></tr>
                     </thead>
                     <tbody id="intervalsBody"></tbody>
                     <tfoot>
                         <tr>
+                            <td style="font-weight:bold; color:#0070c0;" id="newIntCatDisplay">門市</td>
                             <td><input type="text" id="newIntName" class="edit-input" style="width:80px" placeholder="例: 前兩週"></td>
                             <td><input type="number" id="newIntStart" class="edit-input" style="width:50px" placeholder="1"></td>
                             <td><input type="number" id="newIntEnd" class="edit-input" style="width:50px" placeholder="14"></td>
@@ -631,6 +642,7 @@
             const payload = {
                 storeKey: activeStore,
                 storePassword: storePasswords[activeStore] || "1234",
+                storeCategory: (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市", // 👈 新增寫入店家類別
                 staff: state.staff,
                 shiftMap: state.shiftMap,
                 manpower: state.manpower,
@@ -651,14 +663,22 @@
             }
         }
 
-        // 💡 升級版 applyDataToState：讀取時對應底層 uid
         function applyDataToState(data, activeStore) {
-            const storeSelect = document.getElementById('globalStore');
-            if (data.stores && data.stores.length > 0) {
-                state.stores = data.stores;
-                let selected = activeStore || data.stores[0];
-                storeSelect.innerHTML = data.stores.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
-            }
+         data = data || {};
+
+         // 📌 現有店家自動修復邏輯：讀取雲端類別，若無則預設為 "門市"
+         if (!state.storeCategories) state.storeCategories = {};
+         if (data.storeCategories) state.storeCategories = Object.assign(state.storeCategories, data.storeCategories);
+
+         const storeCat = data.storeCategory || state.storeCategories[activeStore] || "門市";
+         state.storeCategories[activeStore] = storeCat;
+
+         // 更新導覽列 Badge 與四週週期的選單
+         updateCategoryBadge(storeCat);
+         const deformCatSelect = document.getElementById('deformCategory');
+         if (deformCatSelect) deformCatSelect.value = storeCat;
+
+         // ... (下方原本的 applyDataToState 程式碼 100% 保持原樣)
 
             state.staff = data.staff || [];
             state.shiftMap = data.shiftMap || [];
@@ -797,7 +817,12 @@
             if (extraColCount > 0) row2 += `<td colspan="${extraColCount}"></td>`;
             row2 += `</tr>`;
 
-            let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000;">${formattedMonthStr}</th>`;
+            // 💡 取得當前門市名稱與機構類別標籤 (如: [門市] 南崁中正)
+            const activeStoreName = document.getElementById('globalStore').value || "南崁中正";
+            const activeStoreCat = (state.storeCategories && state.storeCategories[activeStoreName]) ? state.storeCategories[activeStoreName] : "門市";
+            const storeTitleDisplay = `<div style="font-size:11px; color:#0070c0; font-weight:bold; margin-bottom:2px;">${activeStoreName}</div>`;
+
+            let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
                 let d = new Date(year, month-1, i).getDay();
@@ -1037,18 +1062,31 @@
         }
         function delStaff(idx) { state.staff.splice(idx, 1); renderStaff(); renderSchedule(); }
 
-        function getCurrentIntervalKey() { 
+        // 💡 取得當前變形工時 key（含：類別_年份_月份，例如 "門市_2026-08"）
+        function getCurrentIntervalKey() {
+            const cat = document.getElementById('deformCategory') ? document.getElementById('deformCategory').value : '門市';
             const y = document.getElementById('deformYear').value;
             const m = String(document.getElementById('deformMonth').value).padStart(2, '0');
-            return `${y}-${m}`; 
+            return `${cat}_${y}-${m}`; 
         }
 
         function renderIntervals() {
-            const key = getCurrentIntervalKey();
-            const rawM = Number(document.getElementById('deformMonth').value); 
-            const altKey = `${document.getElementById('deformYear').value}-${rawM}`;
+            const cat = document.getElementById('deformCategory') ? document.getElementById('deformCategory').value : '門市';
+            const catDisplay = document.getElementById('newIntCatDisplay');
+            if (catDisplay) catDisplay.innerText = cat;
 
-            let list = state.intervals[key] || state.intervals[altKey] || [];
+            const key = getCurrentIntervalKey();
+            
+            // 防爆處理：確保 state.intervals 是物件
+            if (!state.intervals || typeof state.intervals !== 'object') state.intervals = {};
+            
+            // 兼容舊資料：若舊資料存在 (純年月) 且新 key 沒資料，先將舊資料複製給「門市」
+            const oldKey = `${document.getElementById('deformYear').value}-${Number(document.getElementById('deformMonth').value)}`;
+            if (!state.intervals[key] && state.intervals[oldKey] && cat === '門市') {
+                state.intervals[key] = [...state.intervals[oldKey]];
+            }
+
+            let list = Array.isArray(state.intervals[key]) ? state.intervals[key] : [];
             state.intervals[key] = list;
 
             const tbody = document.getElementById('intervalsBody');
@@ -1056,6 +1094,7 @@
 
             tbody.innerHTML = list.map((int, i) => `
                 <tr>
+                    <td style="font-weight:bold; color:#0070c0;">${cat}</td>
                     <td><input class="edit-input" style="width:80px" value="${int.name || ''}" onchange="state.intervals['${key}'][${i}].name=this.value"></td>
                     <td><input type="number" class="edit-input" style="width:50px" value="${int.start || 1}" onchange="state.intervals['${key}'][${i}].start=Number(this.value); renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:50px" value="${int.end || 1}" onchange="state.intervals['${key}'][${i}].end=Number(this.value)"></td>
@@ -1083,10 +1122,15 @@
 
         // 💡 全新無彈窗檢核邏輯：計算結果後更新畫面 UI
         function validateDeformRules() {
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            // 💡 自動抓取該店家綁定的類別 (門市/診所)
+            const cat = (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市";
+            
             const dateVal = document.getElementById('schedule-month').value; 
             const [year, month] = dateVal.split('-').map(Number); 
-            const altKey = `${year}-${month}`;
-            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
+            const targetKey = `${cat}_${year}-${String(month).padStart(2, '0')}`;
+            
+            let ints = state.intervals[targetKey] || [];
             
             // 找到這行並替換：
             if(ints.length === 0) return alert(`⚠️ 系統阻擋：無法自動編譯假別！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能依照規定為您精準轉譯。`);
@@ -1200,11 +1244,15 @@
 
         // 💡 升級版 1：一鍵自動編譯 [例休國] (精準判斷 空窗期 與 核心區間)
         function autoFillOffDaysAndAL() {
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            // 💡 自動抓取該店家綁定的類別 (門市/診所)
+            const cat = (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市";
+            
             const dateVal = document.getElementById('schedule-month').value; 
-            const [year, month] = dateVal.split('-').map(Number);
-            const daysInMonth = new Date(year, month, 0).getDate();
-            const altKey = `${year}-${month}`;
-            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
+            const [year, month] = dateVal.split('-').map(Number); 
+            const targetKey = `${cat}_${year}-${String(month).padStart(2, '0')}`;
+            
+            let ints = state.intervals[targetKey] || [];
 
             // 找到這行並替換：
             if(ints.length === 0) return alert(`⚠️ 系統阻擋：無法自動編譯假別！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能依照規定為您精準轉譯。`);
@@ -1303,195 +1351,202 @@
             validateDeformRules();
         }
 
-        // 💡 升級版 2：一鍵最佳化排班 (同步加入空窗期自動判斷)
+        // 💡 終極修正版：精準匹配 [門市/診所_YYYY-MM] Key，防止排班最佳化卡死
         function autoOptimizeSchedule() {
             const dateVal = document.getElementById('schedule-month').value; 
             if (!dateVal) return alert("請先選擇排班年月！");
 
             const [year, month] = dateVal.split('-').map(Number);
+            const formattedMM = String(month).padStart(2, '0');
             const daysInMonth = new Date(year, month, 0).getDate();
-            const altKey = `${year}-${month}`;
-            let ints = state.intervals[dateVal] || state.intervals[altKey] || [];
 
-            // 找到這行並替換：
-            if (ints.length === 0) return alert(`⚠️ 系統阻擋：找不到變形工時設定，無法自動排班！\n\n請先前往上方「四週週期/變形工時」頁籤，建立【${year}年${month}月】的應有例假與休假天數，系統才能替您進行合法的最佳化排班。`);
-            if (state.staff.length === 0) return alert("請先在人員設定中新增員工！");
-            if (state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
+            // 📌 核心修復 1：精準抓取當前店家的機構類別 (門市 / 診所)，並確保月份補零格式一致
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            const cat = (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市";
+            
+            // 嘗試匹配新格式 (例如 "門市_2026-09") 與舊格式 ("2026-09" 或 "2026-9")
+            const targetKey = `${cat}_${year}-${formattedMM}`;
+            const altKey1 = `${year}-${formattedMM}`;
+            const altKey2 = `${year}-${month}`;
+            
+            let ints = state.intervals[targetKey] || state.intervals[altKey1] || state.intervals[altKey2] || [];
 
-            showLoading("正在進行排班最佳化與空窗期判定...");
+            if (!ints || ints.length === 0) {
+                return alert(`⚠️ 系統阻擋：找不到【${cat}】在【${year}年${month}月】的變形工時設定！\n\n請先前往上方「四週週期/變形工時」頁籤，確認類別為【${cat}】並建立該月區間，系統才能進行最佳化排班。`);
+            }
+            if (!state.staff || state.staff.length === 0) return alert("請先在人員設定中新增員工！");
+            if (!state.manpower || state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
+
+            showLoading(`正在進行【${cat}】排班最佳化與空窗期判定...`);
 
             setTimeout(() => {
-                state.staff.forEach(emp => {
-                    if (!emp.shifts) emp.shifts = {};
+                try {
+                    // A. 標記核心區間天數
+                    state.staff.forEach(emp => {
+                        if (!emp.shifts) emp.shifts = {};
 
-                    let coveredDays = new Array(daysInMonth + 1).fill(false);
-                    let totalReqGuo = 0;
+                        let coveredDays = new Array(daysInMonth + 1).fill(false);
+                        let totalReqGuo = 0;
 
-                    ints.forEach(int => {
-                        let rLei = Number(int.reqLei) || 0;
-                        let rXiu = Number(int.reqXiu) || 0;
-                        totalReqGuo += (Number(int.reqGuo) || 0);
-                        if (rLei > 0 || rXiu > 0) {
-                            for(let d = int.start; d <= int.end; d++) {
-                                if(d >= 1 && d <= daysInMonth) coveredDays[d] = true;
+                        ints.forEach(int => {
+                            let rLei = Number(int.reqLei) || 0;
+                            let rXiu = Number(int.reqXiu) || 0;
+                            totalReqGuo += (Number(int.reqGuo) || 0);
+                            if (rLei > 0 || rXiu > 0) {
+                                for(let d = int.start; d <= int.end; d++) {
+                                    if(d >= 1 && d <= daysInMonth) coveredDays[d] = true;
+                                }
                             }
-                        }
-                    });
+                        });
 
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        let k1 = `${year}-${month}-${d}`;
-                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                        if (emp.shifts[dateKey] === '休') emp.shifts[dateKey] = 'WILD';
-                    }
-
-                    // 處理空窗期
-                    let currentGuo = 0;
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        let k1 = `${year}-${month}-${d}`;
-                        let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                        let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                        if (emp.shifts[dateKey] === '國') currentGuo++;
-                    }
-
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        if (!coveredDays[d]) {
+                        // 暫存手劃休假
+                        for (let d = 1; d <= daysInMonth; d++) {
                             let k1 = `${year}-${month}-${d}`;
-                            let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
                             let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                            if (emp.shifts[dateKey] === 'WILD') {
-                                if (currentGuo < totalReqGuo) {
-                                    emp.shifts[dateKey] = '國';
-                                    currentGuo++;
-                                } else {
-                                    emp.shifts[dateKey] = '事';
+                            if (emp.shifts[dateKey] === '休') emp.shifts[dateKey] = 'WILD';
+                        }
+
+                        // 處理空窗期 (國 -> 事)
+                        let currentGuo = 0;
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            let k1 = `${year}-${month}-${d}`;
+                            let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
+                            let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                            if (emp.shifts[dateKey] === '國') currentGuo++;
+                        }
+
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            if (!coveredDays[d]) {
+                                let k1 = `${year}-${month}-${d}`;
+                                let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
+                                let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                                if (emp.shifts[dateKey] === 'WILD') {
+                                    if (currentGuo < totalReqGuo) {
+                                        emp.shifts[dateKey] = '國';
+                                        currentGuo++;
+                                    } else {
+                                        emp.shifts[dateKey] = '事';
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // 處理核心區間
-                    const fillTarget = (targetChar, reqField) => {
-                        ints.forEach(int => {
-                            let req = Number(int[reqField]) || 0;
-                            if (req === 0) return;
-                            let current = 0; let availableWILDs = [];
-                            for (let d = int.start; d <= int.end; d++) {
+                        // 處理核心區間 (例 -> 休 -> 國 -> 特)
+                        const fillTarget = (targetChar, reqField) => {
+                            ints.forEach(int => {
+                                let req = Number(int[reqField]) || 0;
+                                if (req === 0) return;
+                                let current = 0; let availableWILDs = [];
+                                for (let d = int.start; d <= int.end; d++) {
+                                    let k1 = `${year}-${month}-${d}`;
+                                    let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
+                                    let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
+                                    if (emp.shifts[dateKey] === targetChar) current++;
+                                    else if (emp.shifts[dateKey] === 'WILD') availableWILDs.push(dateKey);
+                                }
+                                while (current < req && availableWILDs.length > 0) {
+                                    let dateKey = availableWILDs.shift();
+                                    emp.shifts[dateKey] = targetChar;
+                                    current++;
+                                }
+                            });
+                        };
+
+                        fillTarget('例', 'reqLei'); 
+                        fillTarget('休', 'reqXiu'); 
+                        fillTarget('國', 'reqGuo');
+
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            if (coveredDays[d]) {
                                 let k1 = `${year}-${month}-${d}`;
-                                let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
                                 let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                                if (emp.shifts[dateKey] === targetChar) current++;
-                                else if (emp.shifts[dateKey] === 'WILD') availableWILDs.push(dateKey);
-                            }
-                            while (current < req && availableWILDs.length > 0) {
-                                let dateKey = availableWILDs.shift();
-                                emp.shifts[dateKey] = targetChar;
-                                current++;
-                            }
-                        });
-                    };
-
-                    fillTarget('例', 'reqLei'); 
-                    fillTarget('休', 'reqXiu'); 
-                    fillTarget('國', 'reqGuo');
-
-                    for (let d = 1; d <= daysInMonth; d++) {
-                        if (coveredDays[d]) {
-                            let k1 = `${year}-${month}-${d}`;
-                            let k2 = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                            let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                            if (emp.shifts[dateKey] === 'WILD') {
-                                emp.shifts[dateKey] = '特';
+                                if (emp.shifts[dateKey] === 'WILD') {
+                                    emp.shifts[dateKey] = '特';
+                                }
                             }
                         }
-                    }
-                });
-
-                // =========================================================================
-                // 📌 升級：空白格填補班別 (嚴格判斷「自動排班 = TRUE」且「職位符合」)
-                // =========================================================================
-                const multiSlotShifts = state.shiftMap.filter(m => {
-                    let k = (m.key || '').trim();
-                    if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k)) return false;
-                    
-                    // 💡 新增防線 1：檢查是否允許自動排班 (FALSE 就排除)
-                    if (m.autoAssign === false) return false; 
-                    
-                    let covers = (m.cover || '').split(',').map(x => x.trim()).filter(x => x !== '');
-                    return covers.length >= 2; 
-                });
-
-                if (multiSlotShifts.length === 0) {
-                    hideLoading();
-                    return alert("⚠️ 找不到【涵蓋時段 >= 2 個 且 允許自動排班】的可用班別！\n請至「班別對照表」檢查設定。");
-                }
-
-                for (let day = 1; day <= daysInMonth; day++) {
-                    let k1 = `${year}-${month}-${day}`;
-                    let dWeek = new Date(year, month - 1, day).getDay();
-                    let reqIdx = (dWeek === 0) ? 6 : dWeek - 1; 
-
-                    let availableStaff = state.staff.filter(emp => {
-                        let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
-                        return s === ''; 
                     });
 
-                    availableStaff.sort(() => Math.random() - 0.5);
+                    // 📌 空白格填補班別 (嚴格判斷「自動排班 = TRUE」且「職位符合」)
+                    const multiSlotShifts = state.shiftMap.filter(m => {
+                        let k = (m.key || '').trim();
+                        if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k)) return false;
+                        if (m.autoAssign === false) return false; 
+                        let covers = (m.cover || '').split(',').map(x => x.trim()).filter(x => x !== '');
+                        return covers.length >= 2; 
+                    });
 
-                    state.manpower.forEach(mp => {
-                        let targetReq = mp.reqs[reqIdx] || 0;
-                        let cls = mp.class.toUpperCase();
-                        let currentCount = 0;
+                    if (multiSlotShifts.length > 0) {
+                        for (let day = 1; day <= daysInMonth; day++) {
+                            let k1 = `${year}-${month}-${day}`;
+                            let dWeek = new Date(year, month - 1, day).getDay();
+                            let reqIdx = (dWeek === 0) ? 6 : dWeek - 1; 
 
-                        state.staff.forEach(emp => {
-                            let s = emp.shifts[k1] || '';
-                            let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) 
-                                   || state.shiftMap.find(m => m.key === s);
-                            if (map) {
-                                let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
-                                if (coveredSlots.includes(cls) || s.startsWith(cls)) currentCount++;
-                            }
-                        });
-
-                        let needed = targetReq - currentCount;
-                        while (needed > 0 && availableStaff.length > 0) {
-                            let emp = availableStaff.pop();
-                            
-                            // 💡 新增防線 2：嚴格比對該員工的職位 (必須是自己的職位 或 通用)
-                            let matchedShifts = multiSlotShifts.filter(m => {
-                                let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
-                                let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
-                                return covers.includes(cls) && matchPos; // 職位與時段都必須吻合
+                            let availableStaff = state.staff.filter(emp => {
+                                let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
+                                return s === ''; 
                             });
 
-                            let fallbackShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
-                            
-                            let assignKey = '';
-                            if (matchedShifts.length > 0) {
-                                assignKey = matchedShifts[Math.floor(Math.random() * matchedShifts.length)].key;
-                            } else if (fallbackShifts.length > 0) {
-                                assignKey = fallbackShifts[Math.floor(Math.random() * fallbackShifts.length)].key;
-                            }
+                            availableStaff.sort(() => Math.random() - 0.5);
 
-                            if (assignKey) emp.shifts[k1] = assignKey;
-                            needed--;
-                        }
-                    });
+                            state.manpower.forEach(mp => {
+                                let targetReq = mp.reqs[reqIdx] || 0;
+                                let cls = mp.class.toUpperCase();
+                                let currentCount = 0;
 
-                    // 零空白保底填補
-                    availableStaff.forEach(emp => {
-                        // 同樣嚴格檢查職位
-                        let validShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
-                        if(validShifts.length > 0) {
-                            let randomShift = validShifts[Math.floor(Math.random() * validShifts.length)].key;
-                            emp.shifts[k1] = randomShift;
+                                state.staff.forEach(emp => {
+                                    let s = emp.shifts[k1] || '';
+                                    let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) 
+                                           || state.shiftMap.find(m => m.key === s);
+                                    if (map) {
+                                        let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                        if (coveredSlots.includes(cls) || s.startsWith(cls)) currentCount++;
+                                    }
+                                });
+
+                                let needed = targetReq - currentCount;
+                                while (needed > 0 && availableStaff.length > 0) {
+                                    let emp = availableStaff.pop();
+                                    let matchedShifts = multiSlotShifts.filter(m => {
+                                        let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                        let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
+                                        return covers.includes(cls) && matchPos;
+                                    });
+
+                                    let fallbackShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                                    let assignKey = '';
+                                    if (matchedShifts.length > 0) {
+                                        assignKey = matchedShifts[Math.floor(Math.random() * matchedShifts.length)].key;
+                                    } else if (fallbackShifts.length > 0) {
+                                        assignKey = fallbackShifts[Math.floor(Math.random() * fallbackShifts.length)].key;
+                                    }
+
+                                    if (assignKey) emp.shifts[k1] = assignKey;
+                                    needed--;
+                                }
+                            });
+
+                            availableStaff.forEach(emp => {
+                                let validShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                                if(validShifts.length > 0) {
+                                    let randomShift = validShifts[Math.floor(Math.random() * validShifts.length)].key;
+                                    emp.shifts[k1] = randomShift;
+                                }
+                            });
                         }
-                    });
+                    }
+
+                    renderSchedule();
+                    hideLoading();
+                    showToast(`🎉【${cat}】排班完成！已精準比對變形工時區間！`);
+
+                } catch (err) {
+                    hideLoading();
+                    console.error("最佳化排班發生錯誤:", err);
+                    alert("⚠️ 排班過程發生錯誤：" + err.message);
                 }
-
-                renderSchedule();
-                hideLoading();
-                showToast("🎉 排班完成！空窗期與核心區間的假別已精準判定！");
             }, 300);
         }
         // 💡 升級版：使用 SheetJS 產生飛騰系統完全相容的「真・Excel 檔案」
@@ -1601,33 +1656,27 @@
                 showToast(`🧹 已清空【${emp.name}】${month} 月的個人班表`);
             }
         }
-        // 💡 升級版：點擊按鈕後立即驗證管理者密碼，通過才能新增門市
+        // 💡 升級版：新增門市時選擇類別 [門市/診所]
         function addNewStore(adminPassword) {
-            // 🔒 第一步：立刻彈出密碼驗證框
             const inputPwd = prompt("🔒 請輸入管理者密碼以新增門市：");
+            if (inputPwd === null) return showToast("已取消新增門市");
 
-            if (inputPwd === null) {
-                showToast("已取消新增門市");
-                return;
-            }
-
-            // 比對密碼 (若未帶入參數則預設為 "xup69512369")
             const correctPwd = adminPassword || "xup69512369";
+            if (inputPwd !== correctPwd) return alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
 
-            if (inputPwd !== correctPwd) {
-                alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
-                return;
-            }
-
-            // 🔒 第二步：密碼正確，才允許輸入新門市名稱
-            const newStoreName = prompt("✅ 驗證成功！請輸入新門市名稱（例如：蘆竹診所）：");
+            const newStoreName = prompt("✅ 驗證成功！請輸入新店家名稱（例如：蘆竹診所）：");
             if (newStoreName && newStoreName.trim() !== "") {
                 const storeName = newStoreName.trim();
                 
-                // 第三步：設定該門市的專用登入密碼
-                const newPwd = prompt(`請為【${storeName}】設定日後切換專用的登入密碼：`, "1234");
+                // 📌 選擇店家大類別
+                let storeCat = prompt(`請選擇【${storeName}】的機構類別：\n1. 門市\n2. 診所\n(請輸入數字 1 或 2，預設為 1.門市)`, "1");
+                storeCat = (storeCat === "2" || storeCat === "診所") ? "診所" : "門市";
+
+                const newPwd = prompt(`請為【${storeName}】(${storeCat}) 設定日後切換專用的登入密碼：`, "1234");
                 
                 storePasswords[storeName] = newPwd || "1234";
+                if (!state.storeCategories) state.storeCategories = {};
+                state.storeCategories[storeName] = storeCat; // 儲存店家類別
 
                 const storeSelect = document.getElementById('globalStore');
                 const exists = Array.from(storeSelect.options).some(opt => opt.value === storeName);
@@ -1639,11 +1688,53 @@
                 }
 
                 storeSelect.value = storeName;
-                
-                // 自動將新門市的密碼與狀態存入 Firebase
                 saveToCloud();
-                loadFromCloud();
-                showToast(`🎉 成功建立新門市【${storeName}】！`);
+                loadFromCloud(storeName);
+                showToast(`🎉 成功建立新店家【${storeName}】[${storeCat}]！`);
+            }
+        }
+
+        // 💡 修改現有店家的機構類別 (門市/診所)
+        function changeStoreCategory() {
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            if (!authenticatedStores.includes(activeStore)) {
+                return alert(`🔒 請先完成【${activeStore}】的登入驗證後再修改類別！`);
+            }
+
+            if (!state.storeCategories) state.storeCategories = {};
+            const currentCat = state.storeCategories[activeStore] || "門市";
+
+            let newCat = prompt(`請選擇【${activeStore}】的新機構類別（目前為：${currentCat}）：\n1. 門市\n2. 診所\n(請輸入數字 1 或 2)`, currentCat === "診所" ? "2" : "1");
+            if (newCat === null) return;
+
+            newCat = (newCat === "2" || newCat === "診所") ? "診所" : "門市";
+            state.storeCategories[activeStore] = newCat;
+
+            // 更新畫面與選單
+            updateCategoryBadge(newCat);
+            const deformCatSelect = document.getElementById('deformCategory');
+            if (deformCatSelect) deformCatSelect.value = newCat;
+
+            renderIntervals();
+            saveToCloud();
+            showToast(`🏷️ 已將【${activeStore}】類別更新為：[${newCat}]`);
+        }
+
+        // 💡 輔助函式：同步更新頂部導覽列標題與店家類別標籤
+        function updateCategoryBadge(cat) {
+            const activeStore = document.getElementById('globalStore') ? document.getElementById('globalStore').value : "南崁中正";
+            
+            // 📌 1. 更新頂部大標題（僅顯示：排班與人力控管系統 - 店家名）
+            const sysTitle = document.getElementById('systemTitle');
+            if (sysTitle) {
+                sysTitle.innerText = `排班與人力控管系統 - ${activeStore}`;
+            }
+
+            // 📌 2. 更新下拉選單旁的彩色 Badge 標籤
+            const badge = document.getElementById('storeCategoryBadge');
+            if (badge) {
+                badge.innerText = `[${cat}]`;
+                badge.style.backgroundColor = (cat === "診所") ? "#e91e63" : "#0070c0"; // 診所粉紅，門市深藍
             }
         }
         // 💡 點擊 [職位|組別]：一鍵清空該員「雙時段以上」的班別 (保留例休國特與備註)
@@ -1682,9 +1773,14 @@
         async function syncToGoogleSheetAndSupabase() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             
-            // 僅限南崁中正或全面套用，依照您的需求
+            // 🔒 需求2：嚴格判斷是否為南崁中正，且必須登入
             if (activeStore !== "南崁中正") {
-                if(!confirm(`目前選擇的門市是【${activeStore}】，確定要同步至雲端試算表嗎？`)) return;
+                alert(`⚠️【南崁中正限定功能】\n目前選擇的門市為【${activeStore}】，寫入工作網站功能僅限【南崁中正】使用！`);
+                return;
+            }
+            if (!authenticatedStores.includes("南崁中正")) {
+                alert("🔒 請先按下【🔐 登入】成功完成【南崁中正】權限驗證後再執行此功能！");
+                return;
             }
 
             showLoading("正在將班表同步至 Google Sheet 與 Supabase...");
@@ -1762,6 +1858,92 @@
             
             // 呼叫原本的雲端載入與驗證邏輯
             loadFromCloud(selectedStore);
+        }
+        // 🔒 檢查是否為南崁中正限定
+        function checkNanKanZhongZhengPermission() {
+            const currentStore = document.getElementById('globalStore').value;
+            if (currentStore !== "南崁中正") {
+                alert(`⚠️【南崁中正限定功能】\n目前登入門市為【${currentStore}】，此功能僅限【南崁中正】使用！`);
+                return false;
+            }
+            if (!authenticatedStores.includes("南崁中正")) {
+                alert("🔒 請先按下【🔐 登入】成功完成【南崁中正】權限驗證後再執行此功能！");
+                return false;
+            }
+            return true;
+        }
+
+        // 💡 下載變形工時空白 Excel 範本
+        function downloadDeformTemplate() {
+            if (!checkNanKanZhongZhengPermission()) return;
+
+            const templateData = [
+                ["類別(門市/診所)", "年份", "月份", "區間名稱", "開始日期(1~31)", "結束日期", "應有例假數", "應有休假數", "應有國假數"],
+                ["門市", 2026, 9, "前兩週", 1, 14, 2, 2, 1],
+                ["診所", 2026, 9, "第一週", 1, 7, 1, 1, 0]
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            ws['!cols'] = [{ wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+
+            XLSX.utils.book_append_sheet(wb, ws, "變形工時設定範本");
+            XLSX.writeFile(wb, "變形工時設定空白範本.xlsx");
+            showToast("📥 變形工時範本已成功下載！");
+        }
+
+        // 💡 讀取並寫入 Excel 中的變形工時設定
+        function importDeformExcel(event) {
+            if (!checkNanKanZhongZhengPermission()) {
+                event.target.value = ''; return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showLoading("正在解析變形工時 Excel 檔案...");
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+                    if (jsonData.length <= 1) return alert("❌ 檔案內無有效數據！");
+
+                    let successCount = 0;
+                    if (!state.intervals || typeof state.intervals !== 'object') state.intervals = {};
+
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length < 9) continue;
+
+                        const cat = String(row[0] || '').trim(); 
+                        const y = Number(row[1]); const m = Number(row[2]); 
+                        const name = String(row[3] || '').trim();
+                        const start = Number(row[4]); const end = Number(row[5]);
+                        if (!cat || !y || !m || !name || !start || !end) continue;
+
+                        const targetKey = `${cat}_${y}-${String(m).padStart(2, '0')}`;
+                        if (!state.intervals[targetKey]) state.intervals[targetKey] = [];
+
+                        state.intervals[targetKey].push({
+                            name: name, start: start, end: end,
+                            reqLei: Number(row[6]) || 0, reqXiu: Number(row[7]) || 0, reqGuo: Number(row[8]) || 0
+                        });
+                        successCount++;
+                    }
+
+                    renderIntervals(); saveToCloud();
+                    alert(`🎉 成功匯入 ${successCount} 筆變形工時設定並同步至雲端！`);
+                } catch (err) {
+                    alert("❌ 解析失敗：" + err.message);
+                } finally {
+                    hideLoading(); event.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
         }
     </script>
 </body>

@@ -319,8 +319,8 @@
 
                 <!-- 💡 新增：南崁中正限定功能按鈕區 -->
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="downloadDeformTemplate()">📥 下載空白範本(南崁中正限定)</button>
-                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('deformExcelInput').click()">📤 匯入設定(南崁中正限定)</button>
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="downloadDeformTemplate()">📥 下載空白範本</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('deformExcelInput').click()">📤 匯入設定</button>
                     <input type="file" id="deformExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importDeformExcel(event)">
                 </div>
             </div>
@@ -1859,17 +1859,32 @@
             // 呼叫原本的雲端載入與驗證邏輯
             loadFromCloud(selectedStore);
         }
-        // 🔒 檢查是否為南崁中正限定
+        // 🔒 檢查變形工時 Excel 下載與匯入權限（南崁中正直接通過，其他店家輸入密碼解鎖）
         function checkNanKanZhongZhengPermission() {
-            const currentStore = document.getElementById('globalStore').value;
-            if (currentStore !== "南崁中正") {
-                alert(`⚠️【南崁中正限定功能】\n目前登入門市為【${currentStore}】，此功能僅限【南崁中正】使用！`);
+            const storeSelect = document.getElementById('globalStore');
+            const currentStore = storeSelect ? storeSelect.value : "南崁中正";
+            
+            // 1. 如果是南崁中正，且已通過該門市登入驗證，直接通過
+            if (currentStore === "南崁中正" && authenticatedStores.includes("南崁中正")) {
+                return true;
+            }
+
+            // 2. 如果是其他店家，跳出密碼驗證框（預設密碼 9512369）
+            const inputPwd = prompt(`🔒【${currentStore}】使用變形工時 Excel 匯入/範本下載功能需要進階權限\n請輸入授權密碼：`);
+
+            if (inputPwd === null) {
+                showToast("已取消操作");
                 return false;
             }
-            if (!authenticatedStores.includes("南崁中正")) {
-                alert("🔒 請先按下【🔐 登入】成功完成【南崁中正】權限驗證後再執行此功能！");
+
+            const DEFORM_EXCEL_PASSWORD = "9512369"; // 📌 預設密碼
+
+            if (inputPwd.trim() !== DEFORM_EXCEL_PASSWORD) {
+                alert("❌ 授權密碼錯誤！無法使用此功能。");
                 return false;
             }
+
+            showToast("🔓 驗證成功！已解鎖變形工時 Excel 功能");
             return true;
         }
 

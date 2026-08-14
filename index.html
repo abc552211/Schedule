@@ -127,6 +127,41 @@
         input[type="number"] {
             -moz-appearance: textfield;
         }
+        /* 💡 未登入時的毛玻璃霧面遮罩與提示卡片 */
+        .content-container { position: relative; }
+        
+        #authLockOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(6px); /* 毛玻璃模糊效果 */
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 500;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 80px;
+            box-sizing: border-box;
+        }
+
+        .auth-lock-card {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+            border-radius: 12px;
+            padding: 24px 36px;
+            text-align: center;
+            max-width: 380px;
+            animation: fadeInDown 0.3s ease;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -142,7 +177,7 @@
             <label style="font-weight:bold;">套用門市:</label>
 <!-- 💡 顯示當前店家類別標籤 -->
 <span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
-<select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;">
+<select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
     <option value="南崁中正">南崁中正</option>
 </select>
 <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
@@ -167,6 +202,19 @@
     </div>
 
     <div class="content-container">
+        <!-- 🔒 未登入專屬：霧面鎖定遮罩與引導提示 -->
+        <div id="authLockOverlay">
+            <div class="auth-lock-card">
+                <div style="font-size: 38px; margin-bottom: 8px;">🔒</div>
+                <h3 style="margin: 0 0 8px; color: #333; font-size: 16px;">門市資料已鎖定</h3>
+                <p id="authLockMsg" style="color: #666; font-size: 13px; line-height: 1.5; margin: 0 0 16px;">
+                    請選擇上方門市，並點擊【🔐 登入】按鈕完成權限驗證後開始排班。
+                </p>
+                <button class="btn btn-primary" style="padding: 6px 16px; font-size: 13px;" onclick="handleStoreLogin()">立即前往驗證</button>
+            </div>
+        </div>
+
+        <!-- 下方原本的各個 tab-page 保持原樣 -->
         <div id="tab-schedule" class="tab-page active">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -254,12 +302,13 @@
             <div class="card">
                 <table style="width: auto;">
                     <thead>
-                        <tr><th>時段代碼</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th><th>操作</th></tr>
+                        <tr><th>時段代碼</th><th>適用職位</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th><th>日</th><th>操作</th></tr>
                     </thead>
                     <tbody id="manpowerBody"></tbody>
                     <tfoot>
                         <tr>
                             <td><input type="text" id="newMpClass" class="edit-input" style="width:60px" placeholder="如: A"></td>
+                            <td><input type="text" id="newMpPos" class="edit-input" style="width:60px" value="通用" placeholder="如: 藥師"></td>
                             <td><input type="number" id="newMp1" class="edit-input" style="width:40px" min="0" value="0"></td>
                             <td><input type="number" id="newMp2" class="edit-input" style="width:40px" min="0" value="0"></td>
                             <td><input type="number" id="newMp3" class="edit-input" style="width:40px" min="0" value="0"></td>
@@ -547,58 +596,66 @@
         // 紀錄目前已通過驗證的門市，避免同一頁面重複輸入密碼
         let authenticatedStores = [];
 
-        // 💡 升級版 loadFromCloud：支援預設抓取所有門市，並透過登入按鈕觸發驗證
+        // 💡 升級版 loadFromCloud：支援霧面遮罩即時切換
         async function loadFromCloud(targetStoreName = null) {
             const storeSelect = document.getElementById('globalStore');
+            const overlay = document.getElementById('authLockOverlay');
 
             showLoading("正在同步雲端門市清單...");
 
             try {
-                // 1. 網頁剛開機時：自動去 Firebase 抓取所有建立過的門市清單填入下拉選單
+                // 1. 抓取雲端所有門市清單
                 const storesSnapshot = await db.collection("stores").get();
-                let cloudStores = ["南崁中正"]; // 確保南崁中正一定在最前面
+                let cloudStores = ["南崁中正"]; 
                 
-                storesSnapshot.forEach(doc => {
-                    if (!cloudStores.includes(doc.id)) {
-                        cloudStores.push(doc.id);
-                    }
-                });
+                if (storesSnapshot && storesSnapshot.docs) {
+                    storesSnapshot.docs.forEach(doc => {
+                        if (doc && doc.id && !cloudStores.includes(doc.id)) {
+                            cloudStores.push(doc.id);
+                        }
+                    });
+                }
 
-                // 更新下拉選單選項
-                const currentSelected = storeSelect.value || "南崁中正";
-                storeSelect.innerHTML = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
+                // 重新填充下拉選單
+                const currentSelected = targetStoreName || (storeSelect ? storeSelect.value : "南崁中正") || "南崁中正";
+                if (storeSelect) {
+                    storeSelect.innerHTML = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
+                }
 
-                // 如果沒有指定要登入哪一家（代表是網頁剛整理好自動執行的預設初始化，先不強制彈出密碼框）
+                // 若未按下登入（開機初始化），顯示霧面遮罩並退出
                 if (!targetStoreName) {
+                    if (overlay) overlay.style.display = 'flex';
                     hideLoading();
                     return; 
                 }
 
-                // 2. 當使用者按下【🔐 登入】後：開始讀取該門市詳細資料與密碼驗證
+                // 2. 讀取指定門市詳細資料
                 showLoading(`正在驗證【${targetStoreName}】門市權限...`);
                 const docRef = db.collection("stores").doc(targetStoreName);
                 const docSnap = await docRef.get();
 
-                if (docSnap.exists) {
-                    const data = docSnap.data();
+                if (docSnap && docSnap.exists) {
+                    const data = docSnap.data() || {};
                     
                     if (data.storePassword) {
                         storePasswords[targetStoreName] = data.storePassword;
                     }
                     const targetPassword = storePasswords[targetStoreName] || "1234";
 
-                    // 檢查是否已通過該門市驗證
+                    // 檢查密碼
                     if (!authenticatedStores.includes(targetStoreName)) {
                         hideLoading();
                         const inputPwd = prompt(`🔒 登入【${targetStoreName}】需要權限驗證\n請輸入該門市密碼：`);
 
                         if (inputPwd === null) {
                             showToast("已取消登入");
+                            if (overlay) overlay.style.display = 'flex';
                             return;
                         }
 
                         if (inputPwd !== targetPassword) {
                             alert("❌ 密碼錯誤！無法登入該門市。");
+                            if (overlay) overlay.style.display = 'flex';
                             return;
                         }
 
@@ -607,15 +664,18 @@
                         showLoading(`正在載入【${targetStoreName}】班表...`);
                     }
 
+                    // 🔓 登入成功：隱藏霧面遮罩
+                    if (overlay) overlay.style.display = 'none';
                     applyDataToState(data, targetStoreName);
                     showToast(`【${targetStoreName}】資料登入成功！`);
                 } else {
+                    if (overlay) overlay.style.display = 'none';
                     applyDataToState({}, targetStoreName);
-                    showToast(`【${targetStoreName}】為新門市，請開始排班並儲存`);
+                    showToast(`【${targetStoreName}】為新門市，已初始化`);
                 }
             } catch (err) {
                 console.error("Firebase 讀取失敗:", err);
-                alert("讀取 Firebase 資料失敗：" + err.message);
+                alert("讀取 Firebase 資料失敗：" + (err ? (err.message || err.toString()) : "未知錯誤"));
             } finally {
                 hideLoading();
             }
@@ -778,8 +838,15 @@
                     
                     state.manpower.forEach(mp => {
                         let req = mp.reqs[reqIdx];
+                        let targetPos = (mp.pos || '通用').trim();
                         let currentCount = 0;
+
                         state.staff.forEach(emp => {
+                            // 💡 若人數控管有指定職位，且該員工職位不符合，則不計入
+                            if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) {
+                                return;
+                            }
+
                             let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
                             let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
                             if (map) {
@@ -787,9 +854,12 @@
                                 if (coveredSlots.includes(mp.class.toUpperCase()) || s.startsWith(mp.class)) currentCount++;
                             }
                         });
+
                         let diff = currentCount - req;
-                        if (diff < 0) dailyAlerts.push(`<span class="text-danger">${mp.class}(${Math.abs(diff)})</span>`);
-                        if (diff > 0) dailyAlerts.push(`<span class="text-success">${mp.class}(${diff})</span>`);
+                        let labelName = (targetPos !== '通用' && targetPos !== '') ? `${mp.class}[${targetPos}]` : mp.class;
+
+                        if (diff < 0) dailyAlerts.push(`<span class="text-danger">${labelName}(${Math.abs(diff)})</span>`);
+                        if (diff > 0) dailyAlerts.push(`<span class="text-success">${labelName}(${diff})</span>`);
                     });
                     alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
                 }
@@ -1007,6 +1077,7 @@
             document.getElementById('manpowerBody').innerHTML = state.manpower.map((m, i) => `
                 <tr>
                     <td><input class="edit-input" style="width:60px" value="${m.class}" onchange="state.manpower[${i}].class=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:60px" value="${m.pos || '通用'}" placeholder="通用" onchange="state.manpower[${i}].pos=this.value; renderSchedule();"></td>
                     ${m.reqs.map((r, dayIdx) => `
                         <td><input type="number" class="edit-input" style="width:40px" min="0" value="${r}" onchange="state.manpower[${i}].reqs[${dayIdx}]=Math.max(0, Number(this.value)||0); this.value=state.manpower[${i}].reqs[${dayIdx}]; renderSchedule();"></td>
                     `).join('')}
@@ -1022,8 +1093,13 @@
                 reqs.push(val); 
                 document.getElementById(`newMp${i}`).value = '0'; 
             }
-            state.manpower.push({ class: document.getElementById('newMpClass').value, reqs }); 
+            state.manpower.push({ 
+                class: document.getElementById('newMpClass').value, 
+                pos: document.getElementById('newMpPos').value || '通用',
+                reqs 
+            }); 
             document.getElementById('newMpClass').value = ''; 
+            document.getElementById('newMpPos').value = '通用'; 
             renderManpower(); 
             renderSchedule();
         }
@@ -1351,7 +1427,7 @@
             validateDeformRules();
         }
 
-        // 💡 終極修正版：精準匹配 [門市/診所_YYYY-MM] Key，防止排班最佳化卡死
+        // 💡 升級版：支援「D班/各班別平均放置」與「By 職位精準人力控管」
         function autoOptimizeSchedule() {
             const dateVal = document.getElementById('schedule-month').value; 
             if (!dateVal) return alert("請先選擇排班年月！");
@@ -1360,11 +1436,9 @@
             const formattedMM = String(month).padStart(2, '0');
             const daysInMonth = new Date(year, month, 0).getDate();
 
-            // 📌 核心修復 1：精準抓取當前店家的機構類別 (門市 / 診所)，並確保月份補零格式一致
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             const cat = (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市";
             
-            // 嘗試匹配新格式 (例如 "門市_2026-09") 與舊格式 ("2026-09" 或 "2026-9")
             const targetKey = `${cat}_${year}-${formattedMM}`;
             const altKey1 = `${year}-${formattedMM}`;
             const altKey2 = `${year}-${month}`;
@@ -1372,16 +1446,16 @@
             let ints = state.intervals[targetKey] || state.intervals[altKey1] || state.intervals[altKey2] || [];
 
             if (!ints || ints.length === 0) {
-                return alert(`⚠️ 系統阻擋：找不到【${cat}】在【${year}年${month}月】的變形工時設定！\n\n請先前往上方「四週週期/變形工時」頁籤，確認類別為【${cat}】並建立該月區間，系統才能進行最佳化排班。`);
+                return alert(`⚠️ 系統阻擋：找不到【${cat}】在【${year}年${month}月】的變形工時設定！\n\n請先前往上方「四週週期/變形工時」頁籤確認設定。`);
             }
             if (!state.staff || state.staff.length === 0) return alert("請先在人員設定中新增員工！");
             if (!state.manpower || state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
 
-            showLoading(`正在進行【${cat}】排班最佳化與空窗期判定...`);
+            showLoading(`正在進行【${cat}】排班最佳化 (平均放置班別)...`);
 
             setTimeout(() => {
                 try {
-                    // A. 標記核心區間天數
+                    // 1. 處理核心區間與例休國判定
                     state.staff.forEach(emp => {
                         if (!emp.shifts) emp.shifts = {};
 
@@ -1399,7 +1473,7 @@
                             }
                         });
 
-                        // 暫存手劃休假
+                        // 暫存手劃休假為 WILD
                         for (let d = 1; d <= daysInMonth; d++) {
                             let k1 = `${year}-${month}-${d}`;
                             let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
@@ -1462,85 +1536,134 @@
                                 let k1 = `${year}-${month}-${d}`;
                                 let k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
                                 let dateKey = (emp.shifts[k1] !== undefined) ? k1 : k2;
-                                if (emp.shifts[dateKey] === 'WILD') {
-                                    emp.shifts[dateKey] = '特';
-                                }
+                                if (emp.shifts[dateKey] === 'WILD') emp.shifts[dateKey] = '特';
                             }
                         }
                     });
 
-                    // 📌 空白格填補班別 (嚴格判斷「自動排班 = TRUE」且「職位符合」)
-                    const multiSlotShifts = state.shiftMap.filter(m => {
+                    // 2. 準備可用出勤班別
+                    const availableShifts = state.shiftMap.filter(m => {
                         let k = (m.key || '').trim();
                         if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k)) return false;
-                        if (m.autoAssign === false) return false; 
-                        let covers = (m.cover || '').split(',').map(x => x.trim()).filter(x => x !== '');
-                        return covers.length >= 2; 
+                        if (m.autoAssign === false) return false;
+                        return true;
                     });
 
-                    if (multiSlotShifts.length > 0) {
-                        for (let day = 1; day <= daysInMonth; day++) {
-                            let k1 = `${year}-${month}-${day}`;
-                            let dWeek = new Date(year, month - 1, day).getDay();
-                            let reqIdx = (dWeek === 0) ? 6 : dWeek - 1; 
+                    // 📌 核心機制 1：班別排班次數計數器（用於平均分配 D 班及各班別）
+                    let shiftCountTracker = {};
+                    state.staff.forEach(emp => {
+                        shiftCountTracker[emp.uid || emp.id] = {};
+                        // 統計目前已手動排入的班別次數
+                        for (let d = 1; d <= daysInMonth; d++) {
+                            let k1 = `${year}-${month}-${d}`;
+                            let s = emp.shifts[k1];
+                            if (s) {
+                                shiftCountTracker[emp.uid || emp.id][s] = (shiftCountTracker[emp.uid || emp.id][s] || 0) + 1;
+                            }
+                        }
+                    });
 
-                            let availableStaff = state.staff.filter(emp => {
-                                let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
-                                return s === ''; 
+                    // 3. 逐日填補出勤人力
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        let k1 = `${year}-${month}-${day}`;
+                        let dWeek = new Date(year, month - 1, day).getDay();
+                        let reqIdx = (dWeek === 0) ? 6 : dWeek - 1;
+
+                        // 依據人數控管需求逐一滿足 (精準比對 mp.pos 適用職位)
+                        state.manpower.forEach(mp => {
+                            let targetReq = mp.reqs[reqIdx] || 0;
+                            let cls = mp.class.toUpperCase();
+                            let targetPos = (mp.pos || '通用').trim();
+
+                            // 計算當日該時段（及該職位）已出勤人數
+                            let currentCount = 0;
+                            state.staff.forEach(emp => {
+                                if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) return;
+
+                                let s = emp.shifts[k1] || '';
+                                let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) 
+                                       || state.shiftMap.find(m => m.key === s);
+                                if (map) {
+                                    let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                    if (coveredSlots.includes(cls) || s.toUpperCase() === cls) {
+                                        currentCount++;
+                                    }
+                                }
                             });
 
-                            availableStaff.sort(() => Math.random() - 0.5);
+                            let needed = targetReq - currentCount;
 
-                            state.manpower.forEach(mp => {
-                                let targetReq = mp.reqs[reqIdx] || 0;
-                                let cls = mp.class.toUpperCase();
-                                let currentCount = 0;
+                            // 找出當天尚未排班且職位完全符合的人員
+                            let eligibleStaff = state.staff.filter(emp => {
+                                let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
+                                if (s !== '') return false;
 
-                                state.staff.forEach(emp => {
-                                    let s = emp.shifts[k1] || '';
-                                    let map = state.shiftMap.find(m => m.key === s && (m.pos === emp.pos || m.pos === '通用' || !m.pos)) 
-                                           || state.shiftMap.find(m => m.key === s);
-                                    if (map) {
-                                        let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
-                                        if (coveredSlots.includes(cls) || s.startsWith(cls)) currentCount++;
-                                    }
+                                // 若人數控管指定職位，員工職位必須完全吻合
+                                if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) return false;
+
+                                return availableShifts.some(m => {
+                                    let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                    let matchSlot = covers.includes(cls) || m.key.toUpperCase() === cls;
+                                    let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
+                                    return matchSlot && matchPos;
+                                });
+                            });
+
+                            // 依累積次數最少者優先放置
+                            while (needed > 0 && eligibleStaff.length > 0) {
+                                eligibleStaff.sort((a, b) => {
+                                    let countA = shiftCountTracker[a.uid || a.id][cls] || 0;
+                                    let countB = shiftCountTracker[b.uid || b.id][cls] || 0;
+                                    return countA - countB;
                                 });
 
-                                let needed = targetReq - currentCount;
-                                while (needed > 0 && availableStaff.length > 0) {
-                                    let emp = availableStaff.pop();
-                                    let matchedShifts = multiSlotShifts.filter(m => {
-                                        let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
-                                        let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
-                                        return covers.includes(cls) && matchPos;
-                                    });
+                                let emp = eligibleStaff.shift();
+                                
+                                let matchedShifts = availableShifts.filter(m => {
+                                    let covers = (m.cover || '').split(',').map(x => x.trim().toUpperCase());
+                                    let matchSlot = covers.includes(cls) || m.key.toUpperCase() === cls;
+                                    let matchPos = (m.pos === emp.pos || m.pos === '通用' || !m.pos);
+                                    return matchSlot && matchPos;
+                                });
 
-                                    let fallbackShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
-                                    let assignKey = '';
-                                    if (matchedShifts.length > 0) {
-                                        assignKey = matchedShifts[Math.floor(Math.random() * matchedShifts.length)].key;
-                                    } else if (fallbackShifts.length > 0) {
-                                        assignKey = fallbackShifts[Math.floor(Math.random() * fallbackShifts.length)].key;
-                                    }
+                                matchedShifts.sort((a, b) => {
+                                    let cA = shiftCountTracker[emp.uid || emp.id][a.key] || 0;
+                                    let cB = shiftCountTracker[emp.uid || emp.id][b.key] || 0;
+                                    return cA - cB;
+                                });
 
-                                    if (assignKey) emp.shifts[k1] = assignKey;
+                                if (matchedShifts.length > 0) {
+                                    let chosenShift = matchedShifts[0].key;
+                                    emp.shifts[k1] = chosenShift;
+                                    shiftCountTracker[emp.uid || emp.id][chosenShift] = (shiftCountTracker[emp.uid || emp.id][chosenShift] || 0) + 1;
+                                    shiftCountTracker[emp.uid || emp.id][cls] = (shiftCountTracker[emp.uid || emp.id][cls] || 0) + 1;
                                     needed--;
                                 }
-                            });
+                            }
+                        });
 
-                            availableStaff.forEach(emp => {
-                                let validShifts = multiSlotShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
-                                if(validShifts.length > 0) {
-                                    let randomShift = validShifts[Math.floor(Math.random() * validShifts.length)].key;
-                                    emp.shifts[k1] = randomShift;
+                        // 4. 零空白保底填補（剩餘空白人員，依其職位平均填補可用班別）
+                        state.staff.forEach(emp => {
+                            let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
+                            if (s === '') {
+                                let validShifts = availableShifts.filter(m => (m.pos === emp.pos || m.pos === '通用' || !m.pos));
+                                if (validShifts.length > 0) {
+                                    validShifts.sort((a, b) => {
+                                        let cA = shiftCountTracker[emp.uid || emp.id][a.key] || 0;
+                                        let cB = shiftCountTracker[emp.uid || emp.id][b.key] || 0;
+                                        return cA - cB;
+                                    });
+                                    let chosen = validShifts[0].key;
+                                    emp.shifts[k1] = chosen;
+                                    shiftCountTracker[emp.uid || emp.id][chosen] = (shiftCountTracker[emp.uid || emp.id][chosen] || 0) + 1;
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
 
                     renderSchedule();
                     hideLoading();
-                    showToast(`🎉【${cat}】排班完成！已精準比對變形工時區間！`);
+                    showToast(`🎉【${cat}】排班完成！已依職位限制並平均放置各班別！`);
 
                 } catch (err) {
                     hideLoading();
@@ -1959,6 +2082,20 @@
                 }
             };
             reader.readAsArrayBuffer(file);
+        }
+        // 💡 當下拉選單切換店家時，若尚未通過該店家驗證，自動彈出霧面遮罩
+        function onStoreSelectChange() {
+            const storeName = document.getElementById('globalStore').value;
+            const overlay = document.getElementById('authLockOverlay');
+            const lockMsg = document.getElementById('authLockMsg');
+
+            if (!authenticatedStores.includes(storeName)) {
+                if (overlay) overlay.style.display = 'flex';
+                if (lockMsg) lockMsg.innerText = `目前選擇【${storeName}】，請點擊【🔐 登入】按鈕完成密碼驗證後開始操作。`;
+            } else {
+                if (overlay) overlay.style.display = 'none';
+                loadFromCloud(storeName);
+            }
         }
     </script>
 </body>

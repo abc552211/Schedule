@@ -24,7 +24,7 @@
             --date-bg: #fff176;
             --week-bg: #c8e6c9;
             --stat-bg: #fffde7;
-            --remark-height: 24px;
+            --remark-height: 36px;
         }
         body { font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; font-size: 12px; margin: 0; background-color: var(--primary-bg); color: #333; }
         .top-navbar { background-color: var(--header-bg); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
@@ -231,11 +231,11 @@
                     </select>
 
                     <label style="margin-left:10px;"><strong>備註欄高：</strong></label>
-                    <select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
-                        <option value="24px" selected>雙倍 (預設)</option>
-                        <option value="16px">單列 (緊湊)</option>
-                        <option value="36px">三倍 (高)</option>
-                    </select>
+<select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
+    <option value="36px" selected>三倍 (預設)</option>
+    <option value="24px">雙倍 (中)</option>
+    <option value="16px">單列 (緊湊)</option>
+</select>
                 </div>
 
                 <div class="col-toggle-bar" style="background:#eef2f5; padding: 4px 8px; border-radius:4px; font-size:11px;">
@@ -507,19 +507,32 @@
             const originalOverflow = scrollWrapper ? scrollWrapper.style.overflowX : '';
             if (scrollWrapper) scrollWrapper.style.overflowX = 'visible'; 
             
-            // 📌 3. 終極防截斷法：將 input 暫時替換為 flex 排版的 <span>，讓截圖完美垂直置中
+            // 💡 讀取目前使用者在畫面上設定的備註欄高度 (例如: 16px, 24px, 36px)
+            const currentRemarkHeight = document.getElementById('remarkHeightSelect') ? document.getElementById('remarkHeightSelect').value : '24px';
+
+            // 📌 3. 終極防截斷法：將 input 暫時替換為 flex 排版的 <span>，並完全依照使用者設定的高度進行截圖
             document.querySelectorAll('.cell-input, .remark-input').forEach(input => {
+                const isRemark = input.classList.contains('remark-input');
                 const span = document.createElement('span');
                 span.className = 'temp-span-for-capture';
-                span.style.cssText = input.style.cssText; // 複製原本的顏色與背景
+                span.style.cssText = input.style.cssText; // 複製原本的文字色與背景色
                 span.style.display = 'flex';
                 span.style.alignItems = 'center';
                 span.style.justifyContent = 'center';
                 span.style.width = '100%';
-                span.style.height = '100%';
-                span.style.minHeight = '18px'; // 確保格子有足夠高度
+                
+                // 💡 核心修復：若是備註欄，高度與最小高度皆精準套用選擇的高度 (16px / 24px / 36px)
+                if (isRemark) {
+                    span.style.height = currentRemarkHeight;
+                    span.style.minHeight = currentRemarkHeight;
+                    span.style.lineHeight = currentRemarkHeight;
+                } else {
+                    span.style.height = '100%';
+                    span.style.minHeight = '18px';
+                }
+
                 span.innerText = input.value;
-                input.style.display = 'none'; // 隱藏原本容易截斷的 input
+                input.style.display = 'none'; // 隱藏原本的 input
                 input.parentNode.insertBefore(span, input);
             });
 

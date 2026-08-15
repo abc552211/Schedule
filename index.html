@@ -60,7 +60,7 @@
             padding: 1px 0 !important;
         }
         /* 💡 緊湊舒適比例：姓名欄縮減至 80px，統計欄緊湊化 24~26px */
-.name-col { min-width: 75px !important; width: 80px !important; max-width: 85px !important; padding: 2px 2px !important; }
+.name-col { min-width: 75px !important; width: 70px !important; max-width: 85px !important; padding: 2px 2px !important; }
 .day-col { min-width: 22px !important; width: 24px !important; max-width: 24px !important; padding: 1px 0 !important; }
 .stat-col { min-width: 24px !important; width: 25px !important; max-width: 28px !important; font-size: 11px; line-height: 1.1; padding: 1px 0 !important; }
 
@@ -935,8 +935,8 @@
 
             let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0);
 
-            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架 (姓名欄 80px、日期欄 24px、統計欄 25px)
-            let colgroupHtml = `<col class="col-name" style="width: 80px; min-width: 80px; max-width: 80px;">`;
+            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架 (姓名欄 70px、日期欄 24px、統計欄 25px)
+            let colgroupHtml = `<col class="col-name" style="width: 70px; min-width: 70px; max-width: 80px;">`;
             for(let i = 1; i <= daysInMonth; i++) {
                 colgroupHtml += `<col class="col-day" style="width: 24px; min-width: 24px; max-width: 24px;">`;
             }

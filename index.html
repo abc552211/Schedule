@@ -1769,12 +1769,24 @@
             setDefaultComputerMonth();
             loadFromCloud();
 
-            // 💡 監聽按 Delete 鍵清空格子的功能
+            // 💡 監聽按 Delete 清空 與 Ctrl + V 貼上後自動解除選取 (加速貼上作業)
             document.addEventListener('keydown', function(e) {
-                if (e.key === 'Delete' && document.activeElement && document.activeElement.classList.contains('cell-input')) {
-                    document.activeElement.value = '';
-                    // 觸發 onchange 事件以更新資料
-                    document.activeElement.dispatchEvent(new Event('change'));
+                const activeEl = document.activeElement;
+                if (!activeEl || !activeEl.classList.contains('cell-input')) return;
+
+                // 1. 按 Delete 鍵：清空該格內容
+                if (e.key === 'Delete') {
+                    activeEl.value = '';
+                    activeEl.dispatchEvent(new Event('change'));
+                }
+
+                // 2. 按 Ctrl + V (或 Mac 的 Command + V) 貼上：完成貼上後自動解除選取 (blur)
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+                    // 等待貼上內容寫入格子後，立即觸發 change 並解除焦點
+                    setTimeout(() => {
+                        activeEl.dispatchEvent(new Event('change'));
+                        activeEl.blur(); // 👈 核心：自動解除選取
+                    }, 10);
                 }
             });
         };

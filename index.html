@@ -309,7 +309,7 @@
 <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
             <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
-            <button class="btn btn-primary" onclick="saveToCloud()">同步儲存</button>
+            <button class="btn btn-primary" onclick="saveToCloud()">儲存</button>
             <button class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">寫入工作網站</button>
             <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰</button>
             <button class="btn btn-line" onclick="captureAndCopyForLine()">📥下載班表</button>
@@ -2160,13 +2160,13 @@
                 showToast(`🧹 已清空【${emp.name}】${month} 月的個人班表`);
             }
         }
-        // 💡 升級版：新增門市時選擇類別 [門市/診所]
+        // 💡 修正版：新增門市 (徹底解決資料被舊門市污染/複製的問題)
         function addNewStore(adminPassword) {
             const inputPwd = prompt("🔒 請輸入管理者密碼以新增門市：");
             if (inputPwd === null) return showToast("已取消新增門市");
 
             const correctPwd = adminPassword || "9512369";
-            if (inputPwd !== correctPwd) return alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
+            if (inputPwd.trim() !== correctPwd) return alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
 
             const newStoreName = prompt("✅ 驗證成功！請輸入新店家名稱（例如：蘆竹診所）：");
             if (newStoreName && newStoreName.trim() !== "") {
@@ -2180,8 +2180,16 @@
                 
                 storePasswords[storeName] = newPwd || "1234";
                 if (!state.storeCategories) state.storeCategories = {};
-                state.storeCategories[storeName] = storeCat; // 儲存店家類別
+                state.storeCategories[storeName] = storeCat;
 
+                // 📌 核心關鍵：將記憶體中的狀態完全清空初始化，絕不複製舊門市的資料！
+                state.staff = [];
+                state.shiftMap = [];
+                state.manpower = [];
+                state.intervals = {};
+                state.dailyNotes = {};
+
+                // 更新下拉選單
                 const storeSelect = document.getElementById('globalStore');
                 const exists = Array.from(storeSelect.options).some(opt => opt.value === storeName);
                 if (!exists) {
@@ -2192,9 +2200,13 @@
                 }
 
                 storeSelect.value = storeName;
-                saveToCloud();
-                loadFromCloud(storeName);
-                showToast(`🎉 成功建立新店家【${storeName}】[${storeCat}]！`);
+                authenticatedStores.push(storeName); // 自動將新建立的門市加入已驗證名單
+
+                // 寫入全新空白資料至 Firebase
+                saveToCloud().then(() => {
+                    loadFromCloud(storeName);
+                    showToast(`🎉 成功建立全新空白店家【${storeName}】[${storeCat}]！`);
+                });
             }
         }
         // 💡 僅在成功登入【南崁中正】時才顯示「➕ 新增門市」按鈕

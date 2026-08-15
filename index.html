@@ -148,7 +148,69 @@
         }
         
         select.edit-input, input.edit-input { border: 1px solid #ccc; padding: 3px; border-radius: 3px; font-size: 12px; }
-        input[type="color"] { border: none; width: 32px; height: 26px; padding: 0; cursor: pointer; border-radius: 3px; }
+        /* 💡 蜂巢選色器按鈕與面板樣式 */
+.color-preview-btn {
+    width: 26px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    cursor: pointer;
+    display: inline-block;
+    vertical-align: middle;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    transition: transform 0.1s;
+}
+.color-preview-btn:hover { transform: scale(1.1); }
+
+.honeycomb-picker-popup {
+    display: none;
+    position: absolute;
+    z-index: 10000;
+    background: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    width: 220px;
+    text-align: center;
+}
+.honeycomb-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 8px;
+}
+.honeycomb-row {
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+}
+.honeycomb-cell {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-sizing: border-box;
+    border: 1px solid rgba(0,0,0,0.15);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.honeycomb-cell:hover {
+    transform: scale(1.35);
+    z-index: 2;
+    box-shadow: 0 0 5px rgba(0,0,0,0.4);
+    border: 1.5px solid #fff;
+}
+.honeycomb-custom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #eee;
+    padding-top: 6px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #666;
+}
         
         .btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 5px; font-size: 12px; }
         .btn-success { background-color: #198754; color: white; }
@@ -275,55 +337,70 @@
             </div>
         </div>
 
-        <!-- 下方原本的各個 tab-page 保持原樣 -->
+       <!-- 下方原本的各個 tab-page 保持原樣 -->
         <div id="tab-schedule" class="tab-page active">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label><strong>選擇年月：</strong></label>
-                    <input type="month" id="schedule-month" class="edit-input" onchange="renderSchedule()">
-                    <button class="btn btn-warning" onclick="validateDeformRules()">依區間檢核工時</button>
-                    <button class="btn btn-primary" style="background-color: #6f42c1;" onclick="autoOptimizeSchedule()">⚡ 一鍵最佳化排班</button>
+            
+            <!-- 💡 自適應精緻工具列（標籤精巧、防文字斷行、完整閉合標籤） -->
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; background: #f8f9fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 4px 8px; margin-bottom: 8px;">
+                
+                <!-- 左側：排班操作與顯示設定 -->
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
                     
-                    <label style="margin-left:10px;"><strong>畫面縮放：</strong></label>
-                    <select id="zoomSelect" class="edit-input" onchange="changeZoom(this.value)">
-                        <option value="1">100% (預設)</option>
-                        <option value="0.9">90%</option>
-                        <option value="0.8">80%</option>
-                        <option value="1.1">110%</option>
-                    </select>
-
-                    <label style="margin-left:10px;"><strong>備註欄高：</strong></label>
-                    <select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
-                        <option value="36px" selected>三倍 (預設)</option>
-                        <option value="24px">雙倍 (中)</option>
-                        <option value="16px">單列 (緊湊)</option>
-                    </select>
-
-                    <!-- 💡 新增：備註快速調色/字級面板 (點格子後快速按此變色) -->
-                    <div class="remark-toolbar" style="margin-left: 8px;">
-                        <span style="font-size: 11px; font-weight: bold; color: #666; margin-right: 2px;">備註快選:</span>
-                        <span class="color-dot" style="background:#333333;" onclick="applyQuickRemarkStyle('color', '#333333')" title="黑"></span>
-                        <span class="color-dot" style="background:#d32f2f;" onclick="applyQuickRemarkStyle('color', '#d32f2f')" title="紅"></span>
-                        <span class="color-dot" style="background:#0d6efd;" onclick="applyQuickRemarkStyle('color', '#0d6efd')" title="藍"></span>
-                        <span class="color-dot" style="background:#198754;" onclick="applyQuickRemarkStyle('color', '#198754')" title="綠"></span>
-                        <span class="color-dot" style="background:#6f42c1;" onclick="applyQuickRemarkStyle('color', '#6f42c1')" title="紫"></span>
-                        <span class="color-dot" style="background:#e65100;" onclick="applyQuickRemarkStyle('color', '#e65100')" title="橘"></span>
-                        <span style="color:#ccc; margin:0 2px;">|</span>
-                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '9px')">小</button>
-                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '10px')">中</button>
-                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '12px')">大</button>
-                    </div>
+                    <!-- 1. 年月與主要按鈕 -->
+                    <div style="display: flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px;">
+                        <span style="font-size: 11px; font-weight: bold; color: #444;">年月:</span>
+                        <input type="month" id="schedule-month" class="edit-input" style="padding: 1px 4px; font-size: 11px; height: 22px; width: 105px;" onchange="renderSchedule()">
+                        <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin: 0;" onclick="validateDeformRules()">檢核工時</button>
+                        <button class="btn btn-primary" style="background-color: #6f42c1; padding: 2px 6px; font-size: 11px; margin: 0;" onclick="autoOptimizeSchedule()">⚡ 最佳化</button>
                     </div>
 
-                <div class="col-toggle-bar" style="background:#eef2f5; padding: 4px 8px; border-radius:4px; font-size:11px;">
-                    <strong style="margin-right:4px;">顯示控制：</strong>
-                    <label><input type="checkbox" id="showColAlert" checked onchange="toggleColumns()"> 人力提示</label> | 
-                    <label><input type="checkbox" id="showColReal" checked onchange="toggleColumns()"> 實休</label>
-                    <label><input type="checkbox" id="showColTarget" checked onchange="toggleColumns()"> 帳休</label>
-                    <label><input type="checkbox" id="showColAL" checked onchange="toggleColumns()"> 特休</label>
-                    <label><input type="checkbox" id="showColOT" checked onchange="toggleColumns()"> 加班</label>
-                    <label><input type="checkbox" id="showColRemAL" checked onchange="toggleColumns()"> 剩餘特休</label>
+                    <!-- 2. 縮放與備註欄高 -->
+                    <div style="display: flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px;">
+                        <span style="font-size: 11px; font-weight: bold; color: #444;">縮放:</span>
+                        <select id="zoomSelect" class="edit-input" style="padding: 1px 2px; font-size: 11px; height: 22px;" onchange="changeZoom(this.value)">
+                            <option value="1">100%</option>
+                            <option value="0.9">90%</option>
+                            <option value="0.8">80%</option>
+                            <option value="1.1">110%</option>
+                        </select>
+
+                        <span style="font-size: 11px; font-weight: bold; color: #444; margin-left: 2px;">備註高:</span>
+                        <select id="remarkHeightSelect" class="edit-input" style="padding: 1px 2px; font-size: 11px; height: 22px;" onchange="changeRemarkHeight(this.value)">
+                            <option value="36px" selected>三倍</option>
+                            <option value="24px">雙倍</option>
+                            <option value="16px">單列</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. 備註快捷工具 (調色與字級) -->
+                    <div class="remark-toolbar" style="padding: 2px 6px; gap: 4px; height: 24px; box-sizing: border-box;">
+                        <span style="font-size: 11px; font-weight: bold; color: #666;">快選:</span>
+                        <span class="color-dot" style="background:#333333; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#333333')" title="黑"></span>
+                        <span class="color-dot" style="background:#d32f2f; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#d32f2f')" title="紅"></span>
+                        <span class="color-dot" style="background:#0d6efd; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#0d6efd')" title="藍"></span>
+                        <span class="color-dot" style="background:#198754; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#198754')" title="綠"></span>
+                        <span class="color-dot" style="background:#6f42c1; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#6f42c1')" title="紫"></span>
+                        <span class="color-dot" style="background:#e65100; width:13px; height:13px;" onclick="applyQuickRemarkStyle('color', '#e65100')" title="橘"></span>
+                        <span style="color:#ccc; margin:0 1px;">|</span>
+                        <button type="button" class="size-btn" style="padding: 0 4px; font-size: 10px; height: 18px;" onclick="applyQuickRemarkStyle('size', '9px')">小</button>
+                        <button type="button" class="size-btn" style="padding: 0 4px; font-size: 10px; height: 18px;" onclick="applyQuickRemarkStyle('size', '10px')">中</button>
+                        <button type="button" class="size-btn" style="padding: 0 4px; font-size: 10px; height: 18px;" onclick="applyQuickRemarkStyle('size', '12px')">大</button>
+                    </div>
+
                 </div>
+
+                <!-- 右側：顯示控制欄位 -->
+                <div style="display: flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px; font-size: 11px;">
+                    <strong style="color: #333;">顯示:</strong>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColAlert" checked onchange="toggleColumns()"> 提示</label>
+                    <span style="color: #ccc;">|</span>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColReal" checked onchange="toggleColumns()"> 實休</label>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColTarget" checked onchange="toggleColumns()"> 帳休</label>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColAL" checked onchange="toggleColumns()"> 特休</label>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColOT" checked onchange="toggleColumns()"> 加班</label>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColRemAL" checked onchange="toggleColumns()"> 剩特休</label>
+                </div>
+
             </div>
             
             <div class="quick-ref-bar" id="quickRefContainer"></div>
@@ -364,8 +441,14 @@
                             <td><input type="text" id="newShiftKey" class="edit-input" style="width:50px" placeholder="簡寫"></td>
                             <td><input type="text" id="newShiftPos" class="edit-input" style="width:50px" value="通用"></td>
                             <td><input type="text" id="newShiftCode" class="edit-input" style="width:70px" placeholder="代碼"></td>
-                            <td><input type="color" id="newTextColor" value="#ffffff"></td>
-                            <td><input type="color" id="newBgColor" value="#2196f3"></td>
+                            <td>
+    <input type="hidden" id="newTextColor" value="#ffffff">
+    <div id="newTextColorBtn" class="color-preview-btn" style="background-color: #ffffff;" onclick="openHoneycombPicker(event, 'new', 'text')" title="選擇文字色"></div>
+</td>
+<td>
+    <input type="hidden" id="newBgColor" value="#2196f3">
+    <div id="newBgColorBtn" class="color-preview-btn" style="background-color: #2196f3;" onclick="openHoneycombPicker(event, 'new', 'bg')" title="選擇背景色"></div>
+</td>
                             <td><input type="text" id="newShiftCover" class="edit-input" style="width:80px" placeholder="A,B,C"></td>
                             <td><input type="number" id="newShiftOT" class="edit-input" style="width:40px" step="0.5" value="0"></td>
                             <td><input type="number" id="newShiftAL" class="edit-input" style="width:40px" step="0.5" value="0"></td>
@@ -497,6 +580,15 @@
     </div>
 
     <div id="toast">訊息提示</div>
+    <!-- 💡 蜂巢調色盤彈出視窗容器 -->
+<div id="honeycombPicker" class="honeycomb-picker-popup">
+    <div style="font-size: 11px; font-weight: bold; color: #444; margin-bottom: 6px; text-align: left;">🎨 選擇顏色</div>
+    <div class="honeycomb-grid" id="honeycombGrid"></div>
+    <div class="honeycomb-custom-row">
+        <span>自訂色碼:</span>
+        <input type="color" id="honeycombNativeColor" style="width:24px; height:20px; border:none; cursor:pointer;" onchange="selectHoneycombColor(this.value)">
+    </div>
+</div>
 
     <script>
         // 📌 請確認 projectId 是 schedule-af3b6 (新專案)
@@ -1221,22 +1313,25 @@
 
         function renderShiftCodes() {
             const tbody = document.getElementById('shiftCodesBody');
+            if (!tbody) return;
             tbody.innerHTML = state.shiftMap.map((s, i) => `
                 <tr>
                     <td><input class="edit-input" style="width:80px" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value"></td>
                     <td><input class="edit-input" style="width:50px" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
                     <td><input class="edit-input" style="width:50px" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
                     <td><input class="edit-input" style="width:70px" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
-                    <td><input type="color" value="${s.textColor}" onchange="state.shiftMap[${i}].textColor=this.value; renderSchedule();"></td>
-                    <td><input type="color" value="${s.bgColor}" onchange="state.shiftMap[${i}].bgColor=this.value; renderSchedule();"></td>
+                    <td>
+                        <div class="color-preview-btn" style="background-color: ${s.textColor};" onclick="openHoneycombPicker(event, ${i}, 'textColor')" title="點擊選擇文字色"></div>
+                    </td>
+                    <td>
+                        <div class="color-preview-btn" style="background-color: ${s.bgColor};" onclick="openHoneycombPicker(event, ${i}, 'bgColor')" title="點擊選擇背景色"></div>
+                    </td>
                     <td><input class="edit-input" style="width:70px" value="${s.cover || ''}" placeholder="如:A,B,C" onchange="state.shiftMap[${i}].cover=this.value; renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.ot}" onchange="state.shiftMap[${i}].ot=Number(this.value); renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.al}" onchange="state.shiftMap[${i}].al=Number(this.value); renderSchedule();"></td>
                     <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.cl}" onchange="state.shiftMap[${i}].cl=Number(this.value); renderSchedule();"></td>
                     <td><input type="checkbox" ${s.autoAssign !== false ? 'checked' : ''} style="cursor:pointer; transform:scale(1.2);" onchange="state.shiftMap[${i}].autoAssign=this.checked;"></td>
                     <td><button class="btn btn-danger" onclick="delShiftCode(${i})">刪除</button></td>
-                    
-                    <!-- 💡 新增：唯讀的畫面簡寫預覽，並自動套用設定的文字與背景色 -->
                     <td style="text-align:center; padding: 0 8px;">
                         <span style="display:inline-block; width:100%; font-weight:bold; border-radius:3px; padding:2px 0; color:${s.textColor}; background-color:${s.bgColor};">
                             ${s.key}
@@ -1246,6 +1341,89 @@
             `).join('');
             renderQuickRef();
         }
+
+        // ==========================================
+        // 💡 經典蜂巢色彩資料與控制邏輯
+        // ==========================================
+        const HONEYCOMB_PALETTE = [
+            ["#ffffff", "#cccccc", "#c0c0c0", "#999999", "#666666", "#333333", "#000000"],
+            ["#ffcccc", "#ff6666", "#ff0000", "#cc0000", "#990000", "#660000", "#330000"],
+            ["#ffe5cc", "#ffb266", "#ff8000", "#cc6600", "#994c00", "#663300", "#331900"],
+            ["#ffffcc", "#ffff66", "#ffff00", "#cccc00", "#999900", "#666600", "#333300"],
+            ["#e5ffcc", "#b2ff66", "#66ff00", "#4ccc00", "#399900", "#266600", "#133300"],
+            ["#ccffcc", "#66ff66", "#00ff00", "#00cc00", "#009900", "#006600", "#003300"],
+            ["#ccffe5", "#66ffb2", "#00ff80", "#00cc66", "#00994c", "#006633", "#003319"],
+            ["#ccffff", "#66ffff", "#00ffff", "#00cccc", "#009999", "#006666", "#003333"],
+            ["#cce5ff", "#66b2ff", "#0080ff", "#0066cc", "#004c99", "#003366", "#001933"],
+            ["#ccccff", "#6666ff", "#0000ff", "#0000cc", "#000099", "#000066", "#000033"],
+            ["#e5ccff", "#b266ff", "#7f00ff", "#6600cc", "#4c0099", "#330066", "#190033"],
+            ["#ffccff", "#ff66ff", "#ff00ff", "#cc00cc", "#990099", "#660066", "#330033"],
+            ["#ffcce5", "#ff66b2", "#ff007f", "#cc0066", "#99004c", "#660033", "#330019"]
+        ];
+
+        let activeColorTarget = null;
+
+        function initHoneycombGrid() {
+            const grid = document.getElementById('honeycombGrid');
+            if (!grid) return;
+            grid.innerHTML = HONEYCOMB_PALETTE.map(row => `
+                <div class="honeycomb-row">
+                    ${row.map(color => `
+                        <div class="honeycomb-cell" style="background-color: ${color};" onclick="selectHoneycombColor('${color}')" title="${color}"></div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+
+        function openHoneycombPicker(event, targetIdx, prop) {
+            event.stopPropagation();
+            activeColorTarget = { targetIdx, prop };
+
+            const picker = document.getElementById('honeycombPicker');
+            if (!picker) return;
+
+            initHoneycombGrid();
+
+            const rect = event.target.getBoundingClientRect();
+            picker.style.top = `${rect.bottom + window.scrollY + 5}px`;
+            picker.style.left = `${rect.left + window.scrollX - 50}px`;
+            picker.style.display = 'block';
+        }
+
+        function selectHoneycombColor(hex) {
+            if (!activeColorTarget) return;
+
+            const { targetIdx, prop } = activeColorTarget;
+
+            if (targetIdx === 'new') {
+                if (prop === 'text') {
+                    document.getElementById('newTextColor').value = hex;
+                    document.getElementById('newTextColorBtn').style.backgroundColor = hex;
+                } else if (prop === 'bg') {
+                    document.getElementById('newBgColor').value = hex;
+                    document.getElementById('newBgColorBtn').style.backgroundColor = hex;
+                }
+            } else {
+                state.shiftMap[targetIdx][prop] = hex;
+                renderShiftCodes();
+                renderSchedule();
+            }
+
+            closeHoneycombPicker();
+        }
+
+        function closeHoneycombPicker() {
+            const picker = document.getElementById('honeycombPicker');
+            if (picker) picker.style.display = 'none';
+            activeColorTarget = null;
+        }
+
+        document.addEventListener('click', function(e) {
+            const picker = document.getElementById('honeycombPicker');
+            if (picker && picker.style.display === 'block' && !picker.contains(e.target)) {
+                closeHoneycombPicker();
+            }
+        });
 
         function addShiftCode() {
             state.shiftMap.push({

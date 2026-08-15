@@ -59,8 +59,10 @@
             min-width: 18px !important;
             padding: 1px 0 !important;
         }
-        .name-col { min-width: 90px !important; width: 105px !important; }
-        .stat-col { min-width: 28px !important; width: 30px !important; max-width: 35px !important; font-size: 11px; line-height: 1.1; padding: 1px 0 !important; }
+        /* 💡 緊湊舒適比例：姓名欄縮減至 80px，統計欄緊湊化 24~26px */
+.name-col { min-width: 75px !important; width: 80px !important; max-width: 85px !important; padding: 2px 2px !important; }
+.day-col { min-width: 22px !important; width: 24px !important; max-width: 24px !important; padding: 1px 0 !important; }
+.stat-col { min-width: 24px !important; width: 25px !important; max-width: 28px !important; font-size: 11px; line-height: 1.1; padding: 1px 0 !important; }
 
         .text-danger, .text-success {
             font-weight: normal !important;
@@ -82,8 +84,68 @@
         input.cell-input { width: 100%; border: none; text-align: center; font-size: 12px; background: transparent; padding: 0; margin: 0; font-weight: bold; cursor: text; line-height: normal; vertical-align: middle; }
         input.cell-input:focus { background-color: rgba(255, 255, 255, 0.9); outline: 2px solid #2196f3; }
         
-        input.remark-input { width: 100%; height: var(--remark-height); border: none; text-align: center; font-size: 11px; color: #555; background: transparent; padding: 0; }
-        input.remark-input:focus { background-color: #e3f2fd; outline: 1px solid #2196f3; }
+        /* 💡 備註欄：支援換行、欄寬鎖死、超出隱藏、動態字級與字色 */
+:root {
+    --remark-font-size: 10px;
+    --remark-font-color: #333333;
+}
+
+/* 💡 備註快捷調色盤工具列樣式 (乾淨簡約、防擁擠) */
+        .remark-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 4px 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 1.5px solid #fff;
+            box-shadow: 0 0 0 1px #ccc;
+            transition: transform 0.1s;
+        }
+        .color-dot:hover { transform: scale(1.25); }
+        .size-btn {
+            padding: 1px 6px;
+            font-size: 11px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-weight: bold;
+            color: #444;
+        }
+        .size-btn:hover { background: #e9ecef; }
+
+        /* 💡 備註框：預設上下左右絕對置中、多行換行、欄寬鎖死不變肥 */
+        textarea.remark-input {
+            width: 100%;
+            height: var(--remark-height);
+            border: none;
+            text-align: center;
+            background: transparent;
+            padding: 2px 1px;
+            margin: 0;
+            box-sizing: border-box;
+            font-family: inherit;
+            line-height: 1.2;
+            resize: none;            /* 禁止拖拉大小破壞欄寬 */
+            overflow: hidden;        /* 超出高度自動遮蔽，不擠爆排版 */
+            white-space: pre-wrap;   /* 支援 Enter 換行 */
+            word-break: break-all;   /* 超出自動折行，嚴格防止欄寬變肥 */
+            display: block;
+        }
+        textarea.remark-input:focus {
+            background-color: #e3f2fd !important;
+            outline: 1.5px solid #2196f3;
+            border-radius: 2px;
+        }
         
         select.edit-input, input.edit-input { border: 1px solid #ccc; padding: 3px; border-radius: 3px; font-size: 12px; }
         input[type="color"] { border: none; width: 32px; height: 26px; padding: 0; cursor: pointer; border-radius: 3px; }
@@ -231,12 +293,27 @@
                     </select>
 
                     <label style="margin-left:10px;"><strong>備註欄高：</strong></label>
-<select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
-    <option value="36px" selected>三倍 (預設)</option>
-    <option value="24px">雙倍 (中)</option>
-    <option value="16px">單列 (緊湊)</option>
-</select>
-                </div>
+                    <select id="remarkHeightSelect" class="edit-input" onchange="changeRemarkHeight(this.value)">
+                        <option value="36px" selected>三倍 (預設)</option>
+                        <option value="24px">雙倍 (中)</option>
+                        <option value="16px">單列 (緊湊)</option>
+                    </select>
+
+                    <!-- 💡 新增：備註快速調色/字級面板 (點格子後快速按此變色) -->
+                    <div class="remark-toolbar" style="margin-left: 8px;">
+                        <span style="font-size: 11px; font-weight: bold; color: #666; margin-right: 2px;">備註快選:</span>
+                        <span class="color-dot" style="background:#333333;" onclick="applyQuickRemarkStyle('color', '#333333')" title="黑"></span>
+                        <span class="color-dot" style="background:#d32f2f;" onclick="applyQuickRemarkStyle('color', '#d32f2f')" title="紅"></span>
+                        <span class="color-dot" style="background:#0d6efd;" onclick="applyQuickRemarkStyle('color', '#0d6efd')" title="藍"></span>
+                        <span class="color-dot" style="background:#198754;" onclick="applyQuickRemarkStyle('color', '#198754')" title="綠"></span>
+                        <span class="color-dot" style="background:#6f42c1;" onclick="applyQuickRemarkStyle('color', '#6f42c1')" title="紫"></span>
+                        <span class="color-dot" style="background:#e65100;" onclick="applyQuickRemarkStyle('color', '#e65100')" title="橘"></span>
+                        <span style="color:#ccc; margin:0 2px;">|</span>
+                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '9px')">小</button>
+                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '10px')">中</button>
+                        <button type="button" class="size-btn" onclick="applyQuickRemarkStyle('size', '12px')">大</button>
+                    </div>
+                    </div>
 
                 <div class="col-toggle-bar" style="background:#eef2f5; padding: 4px 8px; border-radius:4px; font-size:11px;">
                     <strong style="margin-right:4px;">顯示控制：</strong>
@@ -480,12 +557,14 @@
 
         function updateDailyNote(dateKey, val) {
             if (!state.dailyNotes) state.dailyNotes = {};
-            state.dailyNotes[dateKey] = val;
+            if (!state.dailyNotes[dateKey] || typeof state.dailyNotes[dateKey] === 'string') {
+                state.dailyNotes[dateKey] = { text: val, color: '#333333', size: '10px' };
+            } else {
+                state.dailyNotes[dateKey].text = val;
+            }
         }
 
-        // 💡 升級版：高畫質、終極防截斷、自訂人力提示與靜默下載
         async function captureAndCopyForLine() {
-            // 📌 1. 下載前詢問：按「確定(是)」隱藏，按「取消(否)」顯示
             const hideAlert = confirm("截圖是否要【隱藏】上方的【人力提示】？\n\n・按「確定」：隱藏人力提示\n・按「取消」：顯示人力提示");
             
             showLoading("正在生成高畫質班表截圖...");
@@ -497,50 +576,59 @@
             const storeName = document.getElementById('globalStore').value || "";
             const fileNameStr = `${year}${month}${storeName}`;
 
-            // 📌 2. 隱藏不必要的元素 (綠勾勾/異常圖示，以及依據使用者選擇隱藏人力提示)
+            // 1. 隱藏不必要的圖示與依選擇隱藏人力提示
             document.querySelectorAll('.val-icon').forEach(el => el.style.display = 'none');
             const alertRow = document.querySelector('.alert-row');
             const origAlertDisplay = alertRow ? alertRow.style.display : '';
-            // 若選擇確定 (hideAlert === true)，則隱藏人力提示列
             if (hideAlert && alertRow) alertRow.style.display = 'none';
 
             const originalOverflow = scrollWrapper ? scrollWrapper.style.overflowX : '';
             if (scrollWrapper) scrollWrapper.style.overflowX = 'visible'; 
             
-            // 💡 讀取目前使用者在畫面上設定的備註欄高度 (例如: 16px, 24px, 36px)
-            const currentRemarkHeight = document.getElementById('remarkHeightSelect') ? document.getElementById('remarkHeightSelect').value : '24px';
+            const origPadding = tableElement.style.padding;
+            tableElement.style.padding = '2px';
 
-            // 📌 3. 終極防截斷法：將 input 暫時替換為 flex 排版的 <span>，並完全依照使用者設定的高度進行截圖
+            const currentRemarkHeight = document.getElementById('remarkHeightSelect') ? document.getElementById('remarkHeightSelect').value : '36px';
+
+            // 2. 暫時將 input / textarea 換成 span 渲染以防字體截斷
             document.querySelectorAll('.cell-input, .remark-input').forEach(input => {
                 const isRemark = input.classList.contains('remark-input');
                 const span = document.createElement('span');
                 span.className = 'temp-span-for-capture';
-                span.style.cssText = input.style.cssText; // 複製原本的文字色與背景色
+                
                 span.style.display = 'flex';
                 span.style.alignItems = 'center';
                 span.style.justifyContent = 'center';
+                span.style.textAlign = 'center';
                 span.style.width = '100%';
-                
-                // 💡 核心修復：若是備註欄，高度與最小高度皆精準套用選擇的高度 (16px / 24px / 36px)
+                span.style.boxSizing = 'border-box';
+                span.style.overflow = 'hidden';
+
                 if (isRemark) {
                     span.style.height = currentRemarkHeight;
                     span.style.minHeight = currentRemarkHeight;
-                    span.style.lineHeight = currentRemarkHeight;
+                    span.style.fontSize = input.style.fontSize || '10px';
+                    span.style.color = input.style.color || '#333333';
+                    span.style.whiteSpace = 'pre-wrap';
+                    span.style.wordBreak = 'break-all';
+                    span.style.lineHeight = '1.15';
+                    span.innerText = input.value || '';
                 } else {
+                    span.style.cssText = input.style.cssText;
+                    span.style.display = 'flex';
+                    span.style.alignItems = 'center';
+                    span.style.justifyContent = 'center';
                     span.style.height = '100%';
                     span.style.minHeight = '18px';
+                    span.innerText = input.value || '';
                 }
 
-                span.innerText = input.value;
-                input.style.display = 'none'; // 隱藏原本的 input
+                input.style.display = 'none';
                 input.parentNode.insertBefore(span, input);
             });
 
-            const origPadding = tableElement.style.padding;
-            tableElement.style.padding = '2px';
-
             try {
-                // 生成極致畫質
+                // 3. 生成極致畫質圖片
                 const canvas = await html2canvas(tableElement, { 
                     scale: 3, 
                     backgroundColor: "#ffffff",
@@ -548,30 +636,27 @@
                     logging: false
                 });
 
-                // 📌 4. 截圖後：立刻還原畫面原本的狀態
+                // 4. 截圖完成：立即還原所有樣式
                 if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
                 if (alertRow) alertRow.style.display = origAlertDisplay;
                 document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
-                
-                // 把原本的 input 變回來，刪除暫時的 span
-                document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
-                document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
-                
                 tableElement.style.padding = origPadding;
 
-                // 📌 5. 靜默下載，移除煩人的系統 alert
+                document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
+                document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
+
                 hideLoading();
                 downloadJPG(canvas, fileNameStr);
-                
+
             } catch (err) {
-                // 發生錯誤也要記得還原畫面
                 if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
                 if (alertRow) alertRow.style.display = origAlertDisplay;
                 document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
+                tableElement.style.padding = origPadding;
+
                 document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
                 document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
-                tableElement.style.padding = origPadding;
-                
+
                 hideLoading();
                 alert("截圖發生錯誤：" + err);
             }
@@ -816,12 +901,23 @@
 
         function renderSchedule() {
             const dateVal = document.getElementById('schedule-month').value;
+            if (!dateVal) return;
+            
             const [year, month] = dateVal.split('-').map(Number);
             const daysInMonth = new Date(year, month, 0).getDate();
             const formattedMonthStr = `${year} / ${String(month).padStart(2, '0')}`;
             
+            const activeStoreName = document.getElementById('globalStore') ? document.getElementById('globalStore').value : "南崁中正";
+            const activeStoreCat = (state.storeCategories && state.storeCategories[activeStoreName]) ? state.storeCategories[activeStoreName] : "門市";
+            const storeTitleDisplay = `<div style="font-size:11px; color:#0070c0; font-weight:bold; margin-bottom:2px;">${activeStoreName}</div>`;
+
+            // 計算目標應有例休國
             let targetLei = 0, targetXiu = 0, targetGuo = 0;
-            const currentIntervals = state.intervals[dateVal] || [];
+            const targetKey = `${activeStoreCat}_${year}-${String(month).padStart(2, '0')}`;
+            const altKey1 = `${year}-${String(month).padStart(2, '0')}`;
+            const altKey2 = `${year}-${month}`;
+            const currentIntervals = state.intervals[targetKey] || state.intervals[altKey1] || state.intervals[altKey2] || [];
+            
             currentIntervals.forEach(int => {
                 targetLei += (int.reqLei || 0);
                 targetXiu += (int.reqXiu || 0);
@@ -830,17 +926,35 @@
             let totalOffTarget = targetLei + targetXiu + targetGuo;
             let targetHintStr = `[ ${targetLei}例 ${targetXiu}休 ${targetGuo}國 ]`;
 
-            const showAlert = document.getElementById('showColAlert').checked;
-            const showReal = document.getElementById('showColReal').checked;
-            const showTarget = document.getElementById('showColTarget').checked;
-            const showAL = document.getElementById('showColAL').checked;
-            const showOT = document.getElementById('showColOT').checked;
-            const showRemAL = document.getElementById('showColRemAL').checked;
+            const showAlert = document.getElementById('showColAlert') ? document.getElementById('showColAlert').checked : true;
+            const showReal = document.getElementById('showColReal') ? document.getElementById('showColReal').checked : true;
+            const showTarget = document.getElementById('showColTarget') ? document.getElementById('showColTarget').checked : true;
+            const showAL = document.getElementById('showColAL') ? document.getElementById('showColAL').checked : true;
+            const showOT = document.getElementById('showColOT') ? document.getElementById('showColOT').checked : true;
+            const showRemAL = document.getElementById('showColRemAL') ? document.getElementById('showColRemAL').checked : true;
 
             let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0);
 
+            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架 (姓名欄 80px、日期欄 24px、統計欄 25px)
+            let colgroupHtml = `<col class="col-name" style="width: 80px; min-width: 80px; max-width: 80px;">`;
+            for(let i = 1; i <= daysInMonth; i++) {
+                colgroupHtml += `<col class="col-day" style="width: 24px; min-width: 24px; max-width: 24px;">`;
+            }
+            if (showReal) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
+            if (showTarget) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
+            if (showAL) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
+            if (showOT) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
+            if (showRemAL) colgroupHtml += `<col style="width: 28px; min-width: 28px; max-width: 28px;">`;
+
+            let tableElement = document.getElementById('scheduleTable');
+            let existingColgroup = tableElement.querySelector('colgroup');
+            if (existingColgroup) existingColgroup.remove();
+            tableElement.insertAdjacentHTML('afterbegin', `<colgroup>${colgroupHtml}</colgroup>`);
+
             let thead = document.getElementById('scheduleHead');
+            if (!thead) return;
             
+            // 1. 人力提示列（最右側不再放紅字提示，改留白）
             let alertRow = '';
             if (showAlert) {
                 alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
@@ -854,14 +968,11 @@
                         let targetPos = (mp.pos || '通用').trim();
                         let currentCount = 0;
 
-                        state.staff.forEach(emp => {
-                            // 💡 若人數控管有指定職位，且該員工職位不符合，則不計入
-                            if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) {
-                                return;
-                            }
+                        state.staff.forEach(staffMember => {
+                            if (targetPos !== '通用' && targetPos !== '' && staffMember.pos !== targetPos) return;
 
-                            let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
-                            let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                            let s = (staffMember.shifts && staffMember.shifts[`${year}-${month}-${i}`]) ? staffMember.shifts[`${year}-${month}-${i}`] : '';
+                            let map = state.shiftMap.find(m => m.key === s && m.pos === staffMember.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
                             if (map) {
                                 let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
                                 if (coveredSlots.includes(mp.class.toUpperCase()) || s.startsWith(mp.class)) currentCount++;
@@ -877,34 +988,44 @@
                     alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
                 }
                 if (extraColCount > 0) {
-                    alertRow += `<td colspan="${extraColCount}" style="color:#d32f2f; font-weight:bold; font-size:11px; text-align:center; background:#fffde7;">${targetHintStr}</td>`;
+                    alertRow += `<td colspan="${extraColCount}"></td>`;
                 }
                 alertRow += `</tr>`;
             }
 
+            // 2. 警告標語列保持原樣
             let row1 = `<tr style="background-color: #fff3cd; color: #856404; font-weight: bold; font-size: 11px;">
-                <td colspan="${1 + daysInMonth + extraColCount}" style="text-align: left; padding: 4px 8px;">
+                <td class="name-col" style="font-size: 11px; color: #856404; background-color: #fff3cd;">提醒事項</td>
+                <td colspan="${daysInMonth}" style="text-align: left; padding: 4px 8px; background-color: #fff3cd;">
                     ⚠️ 下班時間或休息時間到請離開工作崗位，勿未經同意自行加班
-                </td>
-            </tr>`;
+                </td>`;
+            if (extraColCount > 0) {
+                row1 += `<td colspan="${extraColCount}" style="background-color: #fff3cd;"></td>`;
+            }
+            row1 += `</tr>`;
 
+            // 💡 3. 全店備註列：最右側放入 [ 4例 4休 2國 ]（深灰色、字體略細、垂直水平置中）
             let row2 = `<tr style="background-color: #f9f9f9;">
                 <td class="name-col" style="font-size: 11px; font-weight: bold; color: #555;">備註</td>`;
             for(let i=1; i<=daysInMonth; i++) {
                 let dateKey = `${year}-${month}-${i}`;
-                let noteVal = state.dailyNotes[dateKey] || '';
-                row2 += `<td class="day-col">
-                    <input class="remark-input" style="font-size:10px; color:#333;" value="${noteVal}" placeholder="" onchange="updateDailyNote('${dateKey}', this.value)">
+                let rawNote = state.dailyNotes ? state.dailyNotes[dateKey] : '';
+                let noteText = (rawNote && typeof rawNote === 'object') ? (rawNote.text || '') : (rawNote || '');
+                let noteColor = (rawNote && typeof rawNote === 'object') ? (rawNote.color || '#333333') : '#333333';
+                let noteSize = (rawNote && typeof rawNote === 'object') ? (rawNote.size || '10px') : '10px';
+
+                row2 += `<td class="day-col" style="vertical-align: middle;">
+                    <textarea class="remark-input" style="color:${noteColor}; font-size:${noteSize};" 
+                        onfocus="setFocusRemark('daily', null, '${dateKey}', this)"
+                        onchange="updateDailyNote('${dateKey}', this.value)">${noteText}</textarea>
                 </td>`;
             }
-            if (extraColCount > 0) row2 += `<td colspan="${extraColCount}"></td>`;
+            if (extraColCount > 0) {
+                row2 += `<td colspan="${extraColCount}" style="color: #4a5568; font-weight: 500; font-size: 10.5px; text-align: center; vertical-align: middle; padding: 0 2px; white-space: nowrap; letter-spacing: -0.2px;">${targetHintStr}</td>`;
+            }
             row2 += `</tr>`;
 
-            // 💡 取得當前門市名稱與機構類別標籤 (如: [門市] 南崁中正)
-            const activeStoreName = document.getElementById('globalStore').value || "南崁中正";
-            const activeStoreCat = (state.storeCategories && state.storeCategories[activeStoreName]) ? state.storeCategories[activeStoreName] : "門市";
-            const storeTitleDisplay = `<div style="font-size:11px; color:#0070c0; font-weight:bold; margin-bottom:2px;">${activeStoreName}</div>`;
-
+            // 4. 日期與星期表頭列
             let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
@@ -924,25 +1045,24 @@
             dayRow += `</tr>`;
             thead.innerHTML = alertRow + row1 + row2 + dateRow + dayRow;
 
+            // 5. 員工班表列 (tbody)
             let tbody = document.getElementById('scheduleBody');
+            if (!tbody) return;
             tbody.innerHTML = '';
             
             state.staff.forEach((emp, empIdx) => {
-                // 💡 加入 usedCL 來計算補休時數
                 let realOff = 0, usedAL = 0, usedCL = 0, earnedOT = 0;
                 
-                // 1. 動態檢核圖示 (加入 class="val-icon" 以便截圖時自動隱藏)
                 let valUi = '';
-                if (validationResults && validationResults[emp.uid]) {
-                    if (validationResults[emp.uid].ok) {
+                if (validationResults && validationResults[emp.uid || emp.id]) {
+                    if (validationResults[emp.uid || emp.id].ok) {
                         valUi = `<span class="val-icon" style="color: #198754; margin-left: 5px; font-size:14px;" title="檢核通過">✅</span>`;
                     } else {
                         valUi = `<button class="btn btn-danger val-icon" style="padding: 1px 5px; font-size: 11px; margin-left: 5px; border-radius: 4px; font-weight:bold; cursor:pointer;" onclick="highlightErrors(${empIdx}); event.stopPropagation();">⚠️異常</button>`;
                     }
                 }
 
-                // 2. 設定隱藏按鈕：讓 [組別 | 職位] 變成可點擊的清空按鈕
-                let groupPosText = `<span style="font-size:10px; color:#666; font-weight:normal; cursor:pointer;" onclick="clearMultiSlotShifts(${empIdx})" title="💡 點擊清空該員【雙時段以上】出勤班別">${emp.group} | ${emp.pos}</span>`;
+                let groupPosText = `<span style="font-size:10px; color:#666; font-weight:normal; cursor:pointer;" onclick="clearMultiSlotShifts(${empIdx})" title="💡 點擊清空該員【雙時段以上】出勤班別">${emp.group || ''} | ${emp.pos || ''}</span>`;
                 let nameCellHtml = `<strong style="cursor: pointer; color: #0d6efd;" onclick="clearStaffShifts(${empIdx})" title="一鍵清空全部">${emp.name}</strong>${valUi}<br>${groupPosText}`;
                 
                 let shiftRow = `<tr>
@@ -953,7 +1073,10 @@
                 for(let i=1; i<=daysInMonth; i++) {
                     let dateKey = `${year}-${month}-${i}`;
                     let s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
-                    let r = (emp.remarks && emp.remarks[dateKey]) ? emp.remarks[dateKey] : '';
+                    let rawR = (emp.remarks && emp.remarks[dateKey]) ? emp.remarks[dateKey] : '';
+                    let rText = (rawR && typeof rawR === 'object') ? (rawR.text || '') : (rawR || '');
+                    let rColor = (rawR && typeof rawR === 'object') ? (rawR.color || '#333333') : '#333333';
+                    let rSize = (rawR && typeof rawR === 'object') ? (rawR.size || '10px') : '10px';
                     
                     if (['休', '例', '國'].includes(s)) realOff++;
 
@@ -962,7 +1085,7 @@
                     
                     if (map) {
                         usedAL += (Number(map.al) || 0);
-                        usedCL += (Number(map.cl) || 0); // 累加補休時數
+                        usedCL += (Number(map.cl) || 0);
                         earnedOT += (Number(map.ot) || 0);
                     }
 
@@ -970,14 +1093,14 @@
                         <input id="shift-${empIdx}-${i}" class="cell-input" style="${styleStr}" value="${s}" onchange="updateShift(${empIdx}, '${dateKey}', this.value)">
                     </td>`;
 
-                    remarkRow += `<td class="day-col" style="background:#f9f9f9;">
-                        <input class="remark-input" value="${r}" onchange="updateRemark(${empIdx}, '${dateKey}', this.value)">
+                    remarkRow += `<td class="day-col" style="background:#f9f9f9; vertical-align: middle;">
+                        <textarea class="remark-input" style="color:${rColor}; font-size:${rSize};" 
+                            onfocus="setFocusRemark('staff', ${empIdx}, '${dateKey}', this)"
+                            onchange="updateRemark(${empIdx}, '${dateKey}', this.value)">${rText}</textarea>
                     </td>`;
                 }
 
-                // 📌 3. 精準實休計算：原本的例休國天數 + (特休總時數 + 補休總時數) / 8
                 realOff += (usedAL + usedCL) / 8;
-
                 let remAL = (Number(emp.baseAL) || 0) - usedAL;
 
                 if (showReal) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff"><strong>${realOff}</strong></td>`;
@@ -991,15 +1114,16 @@
                 tbody.innerHTML += shiftRow + remarkRow;
             });
 
+            // 6. 底部統計區 (tfoot)
             let tfoot = document.getElementById('scheduleFoot');
+            if (!tfoot) return;
+            
             let classesToCount = ['A', 'B', 'C'];
             let footHtml = '';
 
-            // 💡 1. 產生底部「日期 (1~31)」列
             let footDateRow = `<tr class="header-date-row" style="border-top: 2px solid #aaa;">
                 <th class="name-col" style="font-size:12px; font-weight:bold; background-color: var(--date-bg) !important; color:#333;">日期</th>`;
             
-            // 💡 2. 產生底部「星期 (六日一...)」列
             let footDayRow = `<tr class="header-week-row">
                 <th class="name-col" style="font-size:12px; font-weight:bold; background-color: var(--week-bg) !important; color:#1b5e20;">星期</th>`;
 
@@ -1018,10 +1142,8 @@
             footDateRow += `</tr>`;
             footDayRow += `</tr>`;
 
-            // 先放入「日期」與「星期」兩列
             footHtml += footDateRow + footDayRow;
 
-            // 💡 3. 接續產生 A出勤、B出勤、C出勤 統計數據
             classesToCount.forEach(cls => {
                 footHtml += `<tr style="background-color: var(--stat-bg); font-weight: bold; border-top: 1px solid #ccc;">
                     <td class="name-col" style="text-align:left; padding-left:4px;">${cls}出勤</td>`;
@@ -1033,9 +1155,9 @@
                     let targetReq = mpConfig ? mpConfig.reqs[reqIdx] : 0;
 
                     let count = 0;
-                    state.staff.forEach(emp => {
-                        let s = (emp.shifts && emp.shifts[`${year}-${month}-${i}`]) ? emp.shifts[`${year}-${month}-${i}`] : '';
-                        let map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                    state.staff.forEach(staffMember => {
+                        let s = (staffMember.shifts && staffMember.shifts[`${year}-${month}-${i}`]) ? staffMember.shifts[`${year}-${month}-${i}`] : '';
+                        let map = state.shiftMap.find(m => m.key === s && m.pos === staffMember.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
                         if (map) {
                             let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
                             if (coveredSlots.includes(cls) || s.startsWith(cls)) {
@@ -1055,7 +1177,6 @@
             });
 
             tfoot.innerHTML = footHtml;
-            
             renderQuickRef();
         }
 
@@ -1065,8 +1186,12 @@
             renderSchedule(); 
         }
         function updateRemark(empIdx, dateKey, val) { 
-            if(!state.staff[empIdx].remarks) state.staff[empIdx].remarks = {};
-            state.staff[empIdx].remarks[dateKey] = val; 
+            if (!state.staff[empIdx].remarks) state.staff[empIdx].remarks = {};
+            if (!state.staff[empIdx].remarks[dateKey] || typeof state.staff[empIdx].remarks[dateKey] === 'string') {
+                state.staff[empIdx].remarks[dateKey] = { text: val, color: '#333333', size: '10px' };
+            } else {
+                state.staff[empIdx].remarks[dateKey].text = val;
+            }
         }
 
         function renderShiftCodes() {
@@ -2149,6 +2274,44 @@
                 if (overlay) overlay.style.display = 'none';
                 loadFromCloud(storeName);
             }
+        }
+        function changeRemarkFontSize(val) {
+            document.documentElement.style.setProperty('--remark-font-size', val);
+        }
+        function changeRemarkColor(val) {
+            document.documentElement.style.setProperty('--remark-font-color', val);
+        }
+        // 💡 紀錄當前被點選中的備註格資訊
+        let activeRemarkTarget = null;
+
+        function setFocusRemark(type, empIdx, dateKey, el) {
+            activeRemarkTarget = { type, empIdx, dateKey, element: el };
+        }
+
+        // 💡 點擊快捷按鈕，即時為該格套用顏色或字級
+        function applyQuickRemarkStyle(prop, val) {
+            if (!activeRemarkTarget || !activeRemarkTarget.element) {
+                return showToast("💡 請先用滑鼠點一下要修改的【備註格】！");
+            }
+            const { type, empIdx, dateKey, element } = activeRemarkTarget;
+
+            if (type === 'daily') {
+                if (!state.dailyNotes[dateKey] || typeof state.dailyNotes[dateKey] === 'string') {
+                    state.dailyNotes[dateKey] = { text: state.dailyNotes[dateKey] || '', color: '#333333', size: '10px' };
+                }
+                state.dailyNotes[dateKey][prop] = val;
+            } else if (type === 'staff') {
+                if (!state.staff[empIdx].remarks) state.staff[empIdx].remarks = {};
+                if (!state.staff[empIdx].remarks[dateKey] || typeof state.staff[empIdx].remarks[dateKey] === 'string') {
+                    state.staff[empIdx].remarks[dateKey] = { text: state.staff[empIdx].remarks[dateKey] || '', color: '#333333', size: '10px' };
+                }
+                state.staff[empIdx].remarks[dateKey][prop] = val;
+            }
+
+            // 即時反應在畫面上
+            if (prop === 'color') element.style.color = val;
+            if (prop === 'size') element.style.fontSize = val;
+            showToast(`🎨 備註已套用：${prop === 'color' ? '自訂顏色' : '字級 ' + val}`);
         }
     </script>
 </body>

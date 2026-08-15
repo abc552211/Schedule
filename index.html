@@ -242,7 +242,7 @@
     <option value="南崁中正">南崁中正</option>
 </select>
 <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
-<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="addNewStore('xup69512369')">➕ 新增門市</button>
+<button id="addStoreBtn" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px; display: none;" onclick="addNewStore('9512369')">➕ 新增門市</button>
 <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()">🔑 改密碼</button>
 <button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
@@ -417,7 +417,14 @@
 
         <!-- 4. 人員設定 -->
         <div id="tab-staff" class="tab-page">
-            <h3>員工名冊與時數餘額統計</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0;">員工名冊與時數餘額統計</h3>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="exportStaffExcel()">📤 匯出設定</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('staffExcelInput').click()">📥 匯入設定</button>
+                    <input type="file" id="staffExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importStaffExcel(event)">
+                </div>
+            </div>
             <div class="card">
                 <table style="width: auto;">
                     <thead><tr><th>員工編號</th><th>姓名</th><th>職位</th><th>組別</th><th>特休剩餘(H)</th><th>補休剩餘(H)</th><th>加班累計(H)</th><th>操作</th></tr></thead>
@@ -739,6 +746,7 @@
                 // 若未按下登入（開機初始化），顯示霧面遮罩並退出
                 if (!targetStoreName) {
                     if (overlay) overlay.style.display = 'flex';
+                    checkAddStoreButtonVisibility(); // 👈 未登入時確保隱藏
                     hideLoading();
                     return; 
                 }
@@ -774,6 +782,7 @@
                         }
 
                         authenticatedStores.push(targetStoreName);
+                        checkAddStoreButtonVisibility(); // 👈 登入成功後刷新按鈕顯隱
                         showToast(`🔓 【${targetStoreName}】驗證成功！`);
                         showLoading(`正在載入【${targetStoreName}】班表...`);
                     }
@@ -1978,7 +1987,7 @@
             const inputPwd = prompt("🔒 請輸入管理者密碼以新增門市：");
             if (inputPwd === null) return showToast("已取消新增門市");
 
-            const correctPwd = adminPassword || "xup69512369";
+            const correctPwd = adminPassword || "9512369";
             if (inputPwd !== correctPwd) return alert("❌ 管理者密碼錯誤！您沒有權限新增門市。");
 
             const newStoreName = prompt("✅ 驗證成功！請輸入新店家名稱（例如：蘆竹診所）：");
@@ -2008,6 +2017,21 @@
                 saveToCloud();
                 loadFromCloud(storeName);
                 showToast(`🎉 成功建立新店家【${storeName}】[${storeCat}]！`);
+            }
+        }
+        // 💡 僅在成功登入【南崁中正】時才顯示「➕ 新增門市」按鈕
+        function checkAddStoreButtonVisibility() {
+            const storeSelect = document.getElementById('globalStore');
+            const currentStore = storeSelect ? storeSelect.value : "";
+            const addBtn = document.getElementById('addStoreBtn');
+            
+            if (addBtn) {
+                // 只有目前選中南崁中正，且已通過登入驗證時才顯示
+                if (currentStore === "南崁中正" && authenticatedStores.includes("南崁中正")) {
+                    addBtn.style.display = 'inline-block';
+                } else {
+                    addBtn.style.display = 'none';
+                }
             }
         }
 
@@ -2475,6 +2499,110 @@
             XLSX.writeFile(wb, `${activeStore}_每日人數需求設定.xlsx`);
             showToast("📤 人數控管設定已成功匯出！");
         }
+        // ==========================================
+        // 4. 人員設定：匯出與匯入
+        // ==========================================
+        function exportStaffExcel() {
+            if (!checkConfigPermission("人員設定")) return;
+
+            let exportData = [
+                ["員工編號", "姓名", "職位", "組別", "特休剩餘(H)", "補休剩餘(H)", "加班累計(H)"]
+            ];
+
+            state.staff.forEach(emp => {
+                exportData.push([
+                    emp.id || '',
+                    emp.name || '',
+                    emp.pos || '通用',
+                    emp.group || '',
+                    Number(emp.baseAL) || 0,
+                    Number(emp.baseCL) || 0,
+                    Number(emp.baseOT) || 0
+                ]);
+            });
+
+            // 若目前全無人員，提供預設範例列
+            if (state.staff.length === 0) {
+                exportData.push(["A001", "王小明", "藥師", "A組", 24, 0, 0]);
+            }
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+
+            XLSX.utils.book_append_sheet(wb, ws, "人員名冊設定");
+            const activeStore = document.getElementById('globalStore').value || "門市";
+            XLSX.writeFile(wb, `${activeStore}_員工名冊設定.xlsx`);
+            showToast("📤 人員設定已成功匯出！");
+        }
+
+        function importStaffExcel(event) {
+            if (!checkConfigPermission("人員設定")) {
+                event.target.value = ''; return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const isOverwrite = confirm("請問要如何匯入人員名冊？\n\n・按「確定」：【覆蓋清空】原本的人員名冊\n・按「取消」：【追加合併】至現有人員");
+
+            showLoading("正在解析人員名冊 Excel 檔案...");
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+                    if (jsonData.length <= 1) return alert("❌ 檔案內無有效數據！");
+
+                    let newStaffList = isOverwrite ? [] : [...state.staff];
+                    let count = 0;
+
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length < 2) continue;
+
+                        const id = String(row[0] || '').trim();
+                        const name = String(row[1] || '').trim();
+                        if (!name) continue; // 姓名不能為空
+
+                        const pos = String(row[2] || '通用').trim();
+                        const group = String(row[3] || '').trim();
+                        const baseAL = Number(row[4]) || 0;
+                        const baseCL = Number(row[5]) || 0;
+                        const baseOT = Number(row[6]) || 0;
+
+                        // 📌 核心機制：自動配發底層專屬 UID，並建立獨立 shifts / remarks 物件
+                        newStaffList.push({
+                            uid: `uid_${Date.now()}_${count}_${Math.floor(Math.random() * 1000)}`,
+                            id: id,
+                            name: name,
+                            pos: pos,
+                            group: group,
+                            baseAL: baseAL,
+                            baseCL: baseCL,
+                            baseOT: baseOT,
+                            shifts: {},
+                            remarks: {}
+                        });
+                        count++;
+                    }
+
+                    state.staff = newStaffList;
+                    renderStaff();
+                    renderSchedule();
+                    saveToCloud();
+                    alert(`🎉 成功匯入 ${count} 位員工資料並同步至雲端！`);
+                } catch (err) {
+                    alert("❌ 解析失敗：" + err.message);
+                } finally {
+                    hideLoading(); event.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
 
         function importManpowerExcel(event) {
             if (!checkConfigPermission("人數控管")) {
@@ -2534,11 +2662,12 @@
             };
             reader.readAsArrayBuffer(file);
         }
-        // 💡 當下拉選單切換店家時，若尚未通過該店家驗證，自動彈出霧面遮罩
         function onStoreSelectChange() {
             const storeName = document.getElementById('globalStore').value;
             const overlay = document.getElementById('authLockOverlay');
             const lockMsg = document.getElementById('authLockMsg');
+
+            checkAddStoreButtonVisibility(); // 👈 切換門市時立即重新判定按鈕是否顯示
 
             if (!authenticatedStores.includes(storeName)) {
                 if (overlay) overlay.style.display = 'flex';

@@ -340,9 +340,17 @@
         </div>
 
         <!-- 2. 班別對照表 -->
+        <!-- 2. 班別對照表 -->
         <div id="tab-shifts" class="tab-page">
-            <h3>班別與飛騰系統代碼對照表</h3>
-            <p style="color:#d32f2f;">💡 <strong>提示 (如 B特、B補)：</strong>若該假別請假期間不計入人力，請將【涵蓋時段】<strong>留空</strong>，並設定對應特休/補休時數。</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0;">班別與飛騰系統代碼對照表</h3>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="exportShiftCodesExcel()">📤 匯出設定</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('shiftExcelInput').click()">📥 匯入設定</button>
+                    <input type="file" id="shiftExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importShiftCodesExcel(event)">
+                </div>
+            </div>
+            <p style="color:#d32f2f; margin-top: 0;">💡 <strong>提示 (如 B特、B補)：</strong>若該假別請假期間不計入人力，請將【涵蓋時段】<strong>留空</strong>，並設定對應特休/補休時數。</p>
             <div class="card">
                 <table style="width: auto;">
                     <thead>
@@ -373,8 +381,16 @@
         </div>
 
         <!-- 3. 人數控管 -->
+        <!-- 3. 人數控管 -->
         <div id="tab-manpower" class="tab-page">
-            <h3>每日人力最低需求設定</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0;">每日人力最低需求設定</h3>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="exportManpowerExcel()">📤 匯出設定</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('manpowerExcelInput').click()">📥 匯入設定</button>
+                    <input type="file" id="manpowerExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importManpowerExcel(event)">
+                </div>
+            </div>
             <div class="card">
                 <table style="width: auto;">
                     <thead>
@@ -442,10 +458,10 @@
                     <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
                 </select>
 
-                <!-- 💡 新增：南崁中正限定功能按鈕區 -->
+                <!-- 💡 變形工時匯出匯入按鈕區 -->
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="downloadDeformTemplate()">📥 下載空白範本</button>
-                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('deformExcelInput').click()">📤 匯入設定</button>
+                    <button class="btn btn-line" style="font-size: 11px; padding: 4px 8px;" onclick="exportDeformExcel()">📤 匯出設定</button>
+                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px; background-color: #2196f3;" onclick="document.getElementById('deformExcelInput').click()">📥 匯入設定</button>
                     <input type="file" id="deformExcelInput" accept=".xlsx, .xls" style="display: none;" onchange="importDeformExcel(event)">
                 </div>
             </div>
@@ -2187,57 +2203,92 @@
             // 呼叫原本的雲端載入與驗證邏輯
             loadFromCloud(selectedStore);
         }
-        // 🔒 檢查變形工時 Excel 下載與匯入權限（南崁中正直接通過，其他店家輸入密碼解鎖）
-        function checkNanKanZhongZhengPermission() {
+        // 🔒 通用授權檢查：南崁中正已登入直接通過；其他門市需輸入授權密碼 (9512369)
+        function checkConfigPermission(featureName = "此") {
             const storeSelect = document.getElementById('globalStore');
             const currentStore = storeSelect ? storeSelect.value : "南崁中正";
             
-            // 1. 如果是南崁中正，且已通過該門市登入驗證，直接通過
             if (currentStore === "南崁中正" && authenticatedStores.includes("南崁中正")) {
                 return true;
             }
 
-            // 2. 如果是其他店家，跳出密碼驗證框（預設密碼 9512369）
-            const inputPwd = prompt(`🔒【${currentStore}】使用變形工時 Excel 匯入/範本下載功能需要進階權限\n請輸入授權密碼：`);
-
+            const inputPwd = prompt(`🔒【${currentStore}】使用【${featureName}】匯入/匯出功能需要進階權限\n請輸入授權密碼：`);
             if (inputPwd === null) {
                 showToast("已取消操作");
                 return false;
             }
 
-            const DEFORM_EXCEL_PASSWORD = "9512369"; // 📌 預設密碼
-
-            if (inputPwd.trim() !== DEFORM_EXCEL_PASSWORD) {
+            const AUTH_CONFIG_PASSWORD = "9512369"; // 📌 預設授權密碼
+            if (inputPwd.trim() !== AUTH_CONFIG_PASSWORD) {
                 alert("❌ 授權密碼錯誤！無法使用此功能。");
                 return false;
             }
 
-            showToast("🔓 驗證成功！已解鎖變形工時 Excel 功能");
+            showToast(`🔓 驗證成功！已解鎖【${featureName}】功能`);
             return true;
         }
 
-        // 💡 下載變形工時空白 Excel 範本
-        function downloadDeformTemplate() {
-            if (!checkNanKanZhongZhengPermission()) return;
+        // ==========================================
+        // 1. 變形工時設定：匯出與匯入
+        // ==========================================
+        function exportDeformExcel() {
+            if (!checkConfigPermission("變形工時")) return;
 
-            const templateData = [
-                ["類別(門市/診所)", "年份", "月份", "區間名稱", "開始日期(1~31)", "結束日期", "應有例假數", "應有休假數", "應有國假數"],
-                ["門市", 2026, 9, "前兩週", 1, 14, 2, 2, 1],
-                ["診所", 2026, 9, "第一週", 1, 7, 1, 1, 0]
+            let exportData = [
+                ["類別(門市/診所)", "年份", "月份", "區間名稱", "開始日期(1~31)", "結束日期", "應有例假數", "應有休假數", "應有國假數"]
             ];
 
+            const intervalsObj = state.intervals || {};
+            let count = 0;
+
+            Object.keys(intervalsObj).forEach(key => {
+                let list = intervalsObj[key] || [];
+                if (!Array.isArray(list)) return;
+
+                // 解析 key (例如 "門市_2026-09" 或舊格式 "2026-9")
+                let cat = "門市", y = 2026, m = 9;
+                if (key.includes('_')) {
+                    const parts = key.split('_');
+                    cat = parts[0];
+                    const ym = parts[1].split('-');
+                    y = Number(ym[0]); m = Number(ym[1]);
+                } else if (key.includes('-')) {
+                    const ym = key.split('-');
+                    y = Number(ym[0]); m = Number(ym[1]);
+                }
+
+                list.forEach(int => {
+                    exportData.push([
+                        cat, y, m,
+                        int.name || '',
+                        Number(int.start) || 1,
+                        Number(int.end) || 1,
+                        Number(int.reqLei) || 0,
+                        Number(int.reqXiu) || 0,
+                        Number(int.reqGuo) || 0
+                    ]);
+                    count++;
+                });
+            });
+
+            // 若目前系統全無設定，提供預設範例列供填寫
+            if (count === 0) {
+                exportData.push(["門市", 2026, 9, "前兩週", 1, 14, 2, 2, 1]);
+                exportData.push(["診所", 2026, 9, "第一週", 1, 7, 1, 1, 0]);
+            }
+
             const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
             ws['!cols'] = [{ wch: 15 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
 
-            XLSX.utils.book_append_sheet(wb, ws, "變形工時設定範本");
-            XLSX.writeFile(wb, "變形工時設定空白範本.xlsx");
-            showToast("📥 變形工時範本已成功下載！");
+            XLSX.utils.book_append_sheet(wb, ws, "變形工時設定");
+            const activeStore = document.getElementById('globalStore').value || "門市";
+            XLSX.writeFile(wb, `${activeStore}_四週變形工時設定.xlsx`);
+            showToast("📤 變形工時設定已成功匯出！");
         }
 
-        // 💡 讀取並寫入 Excel 中的變形工時設定
         function importDeformExcel(event) {
-            if (!checkNanKanZhongZhengPermission()) {
+            if (!checkConfigPermission("變形工時")) {
                 event.target.value = ''; return;
             }
 
@@ -2280,6 +2331,201 @@
 
                     renderIntervals(); saveToCloud();
                     alert(`🎉 成功匯入 ${successCount} 筆變形工時設定並同步至雲端！`);
+                } catch (err) {
+                    alert("❌ 解析失敗：" + err.message);
+                } finally {
+                    hideLoading(); event.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ==========================================
+        // 2. 班別對照表：匯出與匯入
+        // ==========================================
+        function exportShiftCodesExcel() {
+            if (!checkConfigPermission("班別對照表")) return;
+
+            let exportData = [
+                ["名稱", "畫面簡寫", "職位", "飛騰代碼", "文字色", "背景色", "涵蓋時段", "加班(增)", "特休(扣)", "補休(扣)", "自動排班(TRUE/FALSE)"]
+            ];
+
+            state.shiftMap.forEach(s => {
+                exportData.push([
+                    s.name || '',
+                    s.key || '',
+                    s.pos || '通用',
+                    s.code || '',
+                    s.textColor || '#ffffff',
+                    s.bgColor || '#2196f3',
+                    s.cover || '',
+                    Number(s.ot) || 0,
+                    Number(s.al) || 0,
+                    Number(s.cl) || 0,
+                    s.autoAssign !== false ? true : false
+                ]);
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            ws['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
+
+            XLSX.utils.book_append_sheet(wb, ws, "班別對照表");
+            const activeStore = document.getElementById('globalStore').value || "門市";
+            XLSX.writeFile(wb, `${activeStore}_班別對照表.xlsx`);
+            showToast("📤 班別對照表已成功匯出！");
+        }
+
+        function importShiftCodesExcel(event) {
+            if (!checkConfigPermission("班別對照表")) {
+                event.target.value = ''; return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const isOverwrite = confirm("請問要如何匯入班別設定？\n\n・按「確定」：【覆蓋清空】原本的班別設定\n・按「取消」：【追加合併】至現有班別");
+
+            showLoading("正在解析班別對照表 Excel 檔案...");
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+                    if (jsonData.length <= 1) return alert("❌ 檔案內無有效數據！");
+
+                    let newShiftMap = isOverwrite ? [] : [...state.shiftMap];
+                    let count = 0;
+
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length < 4) continue;
+
+                        const name = String(row[0] || '').trim();
+                        const key = String(row[1] || '').trim();
+                        const pos = String(row[2] || '通用').trim();
+                        const code = String(row[3] || '').trim();
+                        if (!key) continue;
+
+                        const autoVal = (row[10] === undefined || row[10] === null) ? true : (String(row[10]).toUpperCase() === 'TRUE' || row[10] === true || row[10] === 1);
+
+                        newShiftMap.push({
+                            name: name || key,
+                            key: key,
+                            pos: pos || '通用',
+                            code: code,
+                            textColor: String(row[4] || '#ffffff').trim(),
+                            bgColor: String(row[5] || '#2196f3').trim(),
+                            cover: String(row[6] || '').trim(),
+                            ot: Number(row[7]) || 0,
+                            al: Number(row[8]) || 0,
+                            cl: Number(row[9]) || 0,
+                            autoAssign: autoVal
+                        });
+                        count++;
+                    }
+
+                    state.shiftMap = newShiftMap;
+                    renderShiftCodes();
+                    renderSchedule();
+                    saveToCloud();
+                    alert(`🎉 成功匯入 ${count} 筆班別代碼設定並同步至雲端！`);
+                } catch (err) {
+                    alert("❌ 解析失敗：" + err.message);
+                } finally {
+                    hideLoading(); event.target.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // ==========================================
+        // 3. 每日人數需求設定：匯出與匯入
+        // ==========================================
+        function exportManpowerExcel() {
+            if (!checkConfigPermission("人數控管")) return;
+
+            let exportData = [
+                ["時段代碼", "適用職位", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+            ];
+
+            state.manpower.forEach(m => {
+                exportData.push([
+                    m.class || '',
+                    m.pos || '通用',
+                    Number(m.reqs[0]) || 0,
+                    Number(m.reqs[1]) || 0,
+                    Number(m.reqs[2]) || 0,
+                    Number(m.reqs[3]) || 0,
+                    Number(m.reqs[4]) || 0,
+                    Number(m.reqs[5]) || 0,
+                    Number(m.reqs[6]) || 0
+                ]);
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            ws['!cols'] = [{ wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }];
+
+            XLSX.utils.book_append_sheet(wb, ws, "人數控管設定");
+            const activeStore = document.getElementById('globalStore').value || "門市";
+            XLSX.writeFile(wb, `${activeStore}_每日人數需求設定.xlsx`);
+            showToast("📤 人數控管設定已成功匯出！");
+        }
+
+        function importManpowerExcel(event) {
+            if (!checkConfigPermission("人數控管")) {
+                event.target.value = ''; return;
+            }
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const isOverwrite = confirm("請問要如何匯入人數需求設定？\n\n・按「確定」：【覆蓋清空】原本的人數設定\n・按「取消」：【追加合併】至現有人數需求");
+
+            showLoading("正在解析人數需求 Excel 檔案...");
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+                    if (jsonData.length <= 1) return alert("❌ 檔案內無有效數據！");
+
+                    let newManpower = isOverwrite ? [] : [...state.manpower];
+                    let count = 0;
+
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length < 2) continue;
+
+                        const cls = String(row[0] || '').trim();
+                        const pos = String(row[1] || '通用').trim();
+                        if (!cls) continue;
+
+                        let reqs = [];
+                        for (let d = 2; d <= 8; d++) {
+                            reqs.push(Math.max(0, Number(row[d]) || 0));
+                        }
+
+                        newManpower.push({
+                            class: cls,
+                            pos: pos || '通用',
+                            reqs: reqs
+                        });
+                        count++;
+                    }
+
+                    state.manpower = newManpower;
+                    renderManpower();
+                    renderSchedule();
+                    saveToCloud();
+                    alert(`🎉 成功匯入 ${count} 筆人數控管設定並同步至雲端！`);
                 } catch (err) {
                     alert("❌ 解析失敗：" + err.message);
                 } finally {

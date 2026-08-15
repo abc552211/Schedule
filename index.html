@@ -2070,11 +2070,9 @@
                 showToast(`🧹 已保留假別，並清空【${emp.name}】的多時段班別`);
             }
         }
-        // 💡 將南崁中正當前班表自動推送到 Google Sheet 與 Supabase
         async function syncToGoogleSheetAndSupabase() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             
-            // 🔒 需求2：嚴格判斷是否為南崁中正，且必須登入
             if (activeStore !== "南崁中正") {
                 alert(`⚠️【南崁中正限定功能】\n目前選擇的門市為【${activeStore}】，寫入工作網站功能僅限【南崁中正】使用！`);
                 return;
@@ -2084,34 +2082,63 @@
                 return;
             }
 
-            showLoading("正在將班表同步至 Google Sheet 與 Supabase...");
+            const dateVal = document.getElementById('schedule-month').value;
+            if (!dateVal) {
+                alert("請先選擇排班年月！");
+                return;
+            }
 
-            // 準備要傳送給 Google Apps Script 的 payload
-            let scheduleShifts = {};
+            const [year, month] = dateVal.split('-').map(Number);
+            const formattedMM = String(month).padStart(2, '0');
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            showLoading(`正在同步【${year}年${month}月】班表至 Google Sheet...`);
+
+            const offKeywords = ['例', '休', '國', '特', '事', '病', '補'];
+            let activeWorkRows = [];
+
             state.staff.forEach(emp => {
-                scheduleShifts[emp.uid || emp.id] = emp.shifts || {};
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const formattedDD = String(d).padStart(2, '0');
+                    const k1 = `${year}-${month}-${d}`;
+                    const k2 = `${year}-${formattedMM}-${formattedDD}`;
+
+                    let shiftVal = '';
+                    if (emp.shifts) {
+                        if (emp.shifts[k1] !== undefined) shiftVal = emp.shifts[k1];
+                        else if (emp.shifts[k2] !== undefined) shiftVal = emp.shifts[k2];
+                    }
+                    shiftVal = (shiftVal || '').trim();
+
+                    // 只推送非休假的上班班別
+                    if (shiftVal && !offKeywords.includes(shiftVal)) {
+                        activeWorkRows.push({
+                            date: `${year}-${formattedMM}-${formattedDD}`, // 永遠保持 "YYYY-MM-DD"
+                            name: emp.name,
+                            shift: shiftVal
+                        });
+                    }
+                }
             });
 
             const payloadData = {
-                storeKey: activeStore,
-                staff: state.staff
+                year: year,
+                month: month,
+                workRows: activeWorkRows
             };
 
-            // 替換下方引號內的網址為你剛剛部署得到的 Google Apps Script 網頁應用程式網址
             const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz5qxE_M2klNAyyiGKNRp7rzQ6NlvREYSlEIp9uvxns9rJJyGdiFI8D8SPLPQofywQi/exec"; 
 
             try {
-                const response = await fetch(GAS_WEB_APP_URL, {
+                await fetch(GAS_WEB_APP_URL, {
                     method: "POST",
-                    mode: "no-cors", // Google Apps Script 跨域標準設定
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payloadData)
                 });
 
                 hideLoading();
-                showToast("🚀 班表已成功同步至 Google Sheet 與 Supabase！");
+                showToast("🚀 班表已成功覆蓋同步！舊資料已徹底清除！");
             } catch (err) {
                 hideLoading();
                 console.error("同步失敗:", err);

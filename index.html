@@ -298,8 +298,10 @@
 
     <div class="top-navbar">
         <h2 id="systemTitle" style="margin: 0; font-size: 18px;">排班與人力控管系統 - 南崁中正</h2>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <label style="font-weight:bold;">套用門市:</label>
+        <div style="display: flex; align-items: center; gap: 6px;">
+    <!-- 💡 重新整理按鈕 (純圖示、無邊框) -->
+    <button type="button" style="background: transparent; border: none; color: white; padding: 0; font-size: 15px; margin: 0 2px 0 0; cursor: pointer; line-height: 1; vertical-align: middle;" onclick="reloadCurrentStoreData()" title="重新讀取雲端資料">🔄</button>
+    <label style="font-weight:bold;">套用門市:</label>
 <span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
 <select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
     <option value="南崁中正">南崁中正</option>
@@ -330,11 +332,11 @@
         <div id="authLockOverlay">
             <div class="auth-lock-card">
                 <div style="font-size: 38px; margin-bottom: 8px;">🔒</div>
-                <h3 style="margin: 0 0 8px; color: #333; font-size: 16px;">門市資料已鎖定</h3>
+                <h3 style="margin: 0 0 8px; color: #333; font-size: 16px;">尚未登入</h3>
                 <p id="authLockMsg" style="color: #666; font-size: 13px; line-height: 1.5; margin: 0 0 16px;">
-                    請選擇上方門市，並點擊【🔐 登入】按鈕完成權限驗證後開始排班。
+                    請選擇上方門市，並點擊【🔐 登入】。
                 </p>
-                <button class="btn btn-primary" style="padding: 6px 16px; font-size: 13px;" onclick="handleStoreLogin()">立即前往驗證</button>
+                <button class="btn btn-primary" style="padding: 6px 16px; font-size: 13px;" onclick="handleStoreLogin()">🔒登入</button>
             </div>
         </div>
 
@@ -809,6 +811,8 @@
 
         // 紀錄目前已通過驗證的門市，避免同一頁面重複輸入密碼
         let authenticatedStores = [];
+        // 👑 總管理者旗標：南崁中正登入後即為 true，全店家直接免密碼通行 (F5 後自動失效重置)
+        let isMasterAdminAuthenticated = false;
 
         // 💡 升級版 loadFromCloud：支援霧面遮罩即時切換
         async function loadFromCloud(targetStoreName = null) {
@@ -857,8 +861,10 @@
                     }
                     const targetPassword = storePasswords[targetStoreName] || "1234";
 
-                    // 檢查密碼
-                    if (!authenticatedStores.includes(targetStoreName)) {
+                    // 👑 檢查是否具備免密碼通行權限 (自身已驗證過，或是已登入過南崁中正總管理者)
+                    const hasAccess = authenticatedStores.includes(targetStoreName) || isMasterAdminAuthenticated;
+
+                    if (!hasAccess) {
                         hideLoading();
                         const inputPwd = prompt(`🔒 登入【${targetStoreName}】需要權限驗證\n請輸入該門市密碼：`);
 
@@ -875,9 +881,22 @@
                         }
 
                         authenticatedStores.push(targetStoreName);
-                        checkAddStoreButtonVisibility(); // 👈 登入成功後刷新按鈕顯隱
-                        showToast(`🔓 【${targetStoreName}】驗證成功！`);
+                        
+                        // 👑 若本次登入的是【南崁中正】，直接啟動「全店家免密碼通行」最高權限！
+                        if (targetStoreName === "南崁中正") {
+                            isMasterAdminAuthenticated = true;
+                            showToast("👑 南崁中正總管理員驗證成功！已解鎖全店家免密碼切換！");
+                        } else {
+                            showToast(`🔓 【${targetStoreName}】驗證成功！`);
+                        }
+
+                        checkAddStoreButtonVisibility();
                         showLoading(`正在載入【${targetStoreName}】班表...`);
+                    } else {
+                        // 已經具備管理者通行權限時，確保將該門市也標記為已驗證
+                        if (!authenticatedStores.includes(targetStoreName)) {
+                            authenticatedStores.push(targetStoreName);
+                        }
                     }
 
                     // 🔓 登入成功：隱藏霧面遮罩
@@ -2858,14 +2877,15 @@
             const overlay = document.getElementById('authLockOverlay');
             const lockMsg = document.getElementById('authLockMsg');
 
-            checkAddStoreButtonVisibility(); // 👈 切換門市時立即重新判定按鈕是否顯示
+            checkAddStoreButtonVisibility();
 
-            if (!authenticatedStores.includes(storeName)) {
-                if (overlay) overlay.style.display = 'flex';
-                if (lockMsg) lockMsg.innerText = `目前選擇【${storeName}】，請點擊【🔐 登入】按鈕完成密碼驗證後開始操作。`;
-            } else {
+            // 👑 若已取得總管理權限，切換任何門市都不再跳出遮罩，直接秒切入讀取
+            if (isMasterAdminAuthenticated || authenticatedStores.includes(storeName)) {
                 if (overlay) overlay.style.display = 'none';
                 loadFromCloud(storeName);
+            } else {
+                if (overlay) overlay.style.display = 'flex';
+                if (lockMsg) lockMsg.innerHTML = `目前選擇<strong style="color: #0000ff; font-weight: bold;">【${storeName}】</strong>，請點擊【🔐 登入】完成密碼驗證。`;
             }
         }
         function changeRemarkFontSize(val) {
@@ -2905,6 +2925,36 @@
             if (prop === 'color') element.style.color = val;
             if (prop === 'size') element.style.fontSize = val;
             showToast(`🎨 備註已套用：${prop === 'color' ? '自訂顏色' : '字級 ' + val}`);
+        }
+        // 💡 重新整理當前門市資料 (不登出、直接重新自 Firebase 載入最新班表)
+        async function reloadCurrentStoreData() {
+            const storeSelect = document.getElementById('globalStore');
+            const currentStore = storeSelect ? storeSelect.value : "南崁中正";
+
+            if (!authenticatedStores.includes(currentStore)) {
+                showToast("⚠️ 目前門市尚未登入，請先完成驗證");
+                return;
+            }
+
+            showLoading(`正在重新載入【${currentStore}】最新資料...`);
+
+            try {
+                const docRef = db.collection("stores").doc(currentStore);
+                const docSnap = await docRef.get();
+
+                if (docSnap && docSnap.exists) {
+                    const data = docSnap.data() || {};
+                    applyDataToState(data, currentStore);
+                    showToast(`🔄 已成功重新整理【${currentStore}】最新資料！`);
+                } else {
+                    showToast(`⚠️ 查無【${currentStore}】雲端資料`);
+                }
+            } catch (err) {
+                console.error("重新載入失敗:", err);
+                alert("重新讀取失敗：" + (err.message || err));
+            } finally {
+                hideLoading();
+            }
         }
     </script>
 </body>

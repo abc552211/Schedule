@@ -523,7 +523,7 @@
             </div>
             <div class="card">
                 <table style="width: auto;">
-                    <thead><tr><th>員工編號</th><th>姓名</th><th>職位</th><th>組別</th><th>特休剩餘(H)</th><th>補休剩餘(H)</th><th>加班累計(H)</th><th>操作</th></tr></thead>
+                    <thead><tr><th>員工編號</th><th>姓名</th><th>職位</th><th>組別</th><th>特休期初額度(H)</th><th>補休期初額度(H)</th><th>歷史加班累計(H)</th><th>操作</th></tr></thead>
                     <tbody id="staffBody"></tbody>
                     <tfoot>
                         <tr>
@@ -926,35 +926,33 @@
             }
         }
 
-        // 💡 升級版 saveToCloud：儲存時自動將當月班表的特休/補休/加班結算進人員基礎數值
+        // 💡 終極安全版 saveToCloud：保留期初基準額度，杜絕「重複儲存重複扣除」！
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             const dateVal = document.getElementById('schedule-month').value;
             
-            if (!dateVal) return alert("請先選擇排班年月！");
-
-            const [year, month] = dateVal.split('-').map(Number);
-            const daysInMonth = new Date(year, month, 0).getDate();
-
             // 💡 歷史月份儲存防呆警示
-            const now = new Date();
-            const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
-            const selectedYearMonth = year * 12 + month;
+            if (dateVal) {
+                const [year, month] = dateVal.split('-').map(Number);
+                const now = new Date();
+                const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
+                const selectedYearMonth = year * 12 + month;
 
-            if (selectedYearMonth < currentYearMonth) {
-                const confirmPastSave = confirm(`⚠️【歷史月份儲存警告】\n\n您目前正在儲存【${year}年${month}月】（過往歷史月份）的班表！\n修改過往班表可能會導致人員特休、補休及加班累計產生時間序誤差。\n\n確定仍要覆蓋儲存此歷史班表嗎？`);
-                if (!confirmPastSave) {
-                    showToast("已取消儲存");
-                    return;
+                if (selectedYearMonth < currentYearMonth) {
+                    const confirmPastSave = confirm(`⚠️【歷史月份儲存警告】\n\n您目前正在儲存【${year}年${month}月】（過往歷史月份）的班表！\n修改過往班表可能會導致時數時間序紀錄產生變動。\n\n確定仍要覆蓋儲存此歷史班表嗎？`);
+                    if (!confirmPastSave) {
+                        showToast("已取消儲存");
+                        return;
+                    }
                 }
             }
 
-            showLoading(`正在將【${activeStore}】寫入 Firebase 並自動結算人員基礎時數...`);
+            showLoading(`正在將【${activeStore}】寫入 Firebase...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
 
-            // 📌 核心機制：逐一結算每位員工的當月時數消耗與累計
+            // 整理班表資料與 UID，絕不竄改 baseAL / baseCL 基礎額度
             state.staff.forEach((emp, idx) => {
                 if (!emp.uid) {
                     emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
@@ -962,34 +960,6 @@
 
                 scheduleShifts[emp.uid] = emp.shifts || {};
                 scheduleRemarks[emp.uid] = emp.remarks || {};
-
-                // 統計該員工在當選定月份內所使用的特休、補休與產生的加班
-                let monthUsedAL = 0;
-                let monthUsedCL = 0;
-                let monthEarnedOT = 0;
-
-                for (let d = 1; d <= daysInMonth; d++) {
-                    const dateKey = `${year}-${month}-${d}`;
-                    const s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
-                    
-                    if (s) {
-                        const map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
-                        if (map) {
-                            monthUsedAL += (Number(map.al) || 0);
-                            monthUsedCL += (Number(map.cl) || 0);
-                            monthEarnedOT += (Number(map.ot) || 0);
-                        }
-                    }
-                }
-
-                // 💡 1. 剩餘特休結算入人員基本資料
-                emp.baseAL = (Number(emp.baseAL) || 0) - monthUsedAL;
-
-                // 💡 2. 剩餘補休結算入人員基本資料 (加班 1:1 增加，補休 1:1 扣除)
-                emp.baseCL = (Number(emp.baseCL) || 0) + monthEarnedOT - monthUsedCL;
-
-                // 💡 3. 加班累計純累加，不參與扣除
-                emp.baseOT = (Number(emp.baseOT) || 0) + monthEarnedOT;
             });
 
             const payload = {
@@ -1007,9 +977,9 @@
 
             try {
                 await db.collection("stores").doc(activeStore).set(payload, { merge: true });
-                renderStaff();    // 立即更新人員設定表格上的數值
-                renderSchedule(); // 重新渲染班表畫面
-                showToast(`🎉【${activeStore}】儲存成功！人員特休/補休/加班時數已同步結算更新！`);
+                renderStaff();
+                renderSchedule();
+                showToast(`🎉【${activeStore}】班表與人員資料已安全同步儲存！`);
             } catch (err) {
                 console.error("Firebase 儲存失敗:", err);
                 alert("儲存至 Firebase 失敗：" + err.message);
@@ -1095,6 +1065,35 @@
             container.innerHTML = `<span style="font-size: 12px; font-weight: bold; color: #555; margin-right: 5px;">快捷面板:</span>` + 
                 displayShifts.map(m => `<div class="ref-btn" style="color:${m.textColor}; background-color:${m.bgColor};" onclick="copyToClipboard('${m.key}')" title="點擊複製 ${m.key}">${m.key}</div>`).join('');
         }
+        // 💡 跨月時數滾動結轉核心：自動計算目標年月之前「所有過往歷史月份」的累計時數
+        function getHistoricalStats(emp, targetYear, targetMonth) {
+            let prevUsedAL = 0;
+            let prevUsedCL = 0;
+            let prevEarnedOT = 0;
+
+            if (emp && emp.shifts) {
+                Object.keys(emp.shifts).forEach(dKey => {
+                    const parts = dKey.split('-').map(Number);
+                    if (parts.length === 3) {
+                        const sYear = parts[0];
+                        const sMonth = parts[1];
+                        // 僅統計早於當前查看年月的歷史月份
+                        if (sYear < targetYear || (sYear === targetYear && sMonth < targetMonth)) {
+                            const s = emp.shifts[dKey];
+                            if (s) {
+                                const map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                                if (map) {
+                                    prevUsedAL += (Number(map.al) || 0);
+                                    prevUsedCL += (Number(map.cl) || 0);
+                                    prevEarnedOT += (Number(map.ot) || 0);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            return { prevUsedAL, prevUsedCL, prevEarnedOT };
+        }
 
         function renderSchedule() {
             const dateVal = document.getElementById('schedule-month').value;
@@ -1110,18 +1109,12 @@
             const selectedYearMonth = year * 12 + month;
             const isPastMonth = selectedYearMonth < currentYearMonth;
 
-            // 💡 依據是否為過去月份，動態替換表格的灰階樣式 (安全掛載)
+            // 💡 歷史月份低飽和度樣式安全掛載
             const schedTable = document.getElementById('scheduleTable');
             if (schedTable) {
-                if (isPastMonth) {
-                    schedTable.classList.add('past-month-table');
-                } else {
-                    schedTable.classList.remove('past-month-table');
-                }
+                if (isPastMonth) schedTable.classList.add('past-month-table');
+                else schedTable.classList.remove('past-month-table');
             }
-            
-            
-            
 
             const activeStoreName = document.getElementById('globalStore') ? document.getElementById('globalStore').value : "南崁中正";
             const activeStoreCat = (state.storeCategories && state.storeCategories[activeStoreName]) ? state.storeCategories[activeStoreName] : "門市";
@@ -1154,7 +1147,7 @@
 
             let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0) + (showRemCL?1:0);
 
-            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架
+            // 動態產生 colgroup
             let colgroupHtml = `<col class="col-name" style="width: 70px; min-width: 70px; max-width: 80px;">`;
             for(let i = 1; i <= daysInMonth; i++) {
                 colgroupHtml += `<col class="col-day" style="width: 24px; min-width: 24px; max-width: 24px;">`;
@@ -1207,21 +1200,17 @@
                     });
                     alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
                 }
-                if (extraColCount > 0) {
-                    alertRow += `<td colspan="${extraColCount}"></td>`;
-                }
+                if (extraColCount > 0) alertRow += `<td colspan="${extraColCount}"></td>`;
                 alertRow += `</tr>`;
             }
 
-            // 2. 警告標語列
+            // 2. 提醒事項
             let row1 = `<tr style="background-color: #fff3cd; color: #856404; font-weight: bold; font-size: 11px;">
                 <td class="name-col" style="font-size: 11px; color: #856404; background-color: #fff3cd;">提醒事項</td>
                 <td colspan="${daysInMonth}" style="text-align: left; padding: 4px 8px; background-color: #fff3cd;">
                     ⚠️ 下班時間或休息時間到請離開工作崗位，勿未經同意自行加班
                 </td>`;
-            if (extraColCount > 0) {
-                row1 += `<td colspan="${extraColCount}" style="background-color: #fff3cd;"></td>`;
-            }
+            if (extraColCount > 0) row1 += `<td colspan="${extraColCount}" style="background-color: #fff3cd;"></td>`;
             row1 += `</tr>`;
 
             // 3. 全店備註列
@@ -1245,8 +1234,7 @@
             }
             row2 += `</tr>`;
 
-            // 4. 日期與星期表頭列
-            let dateRowBg = isPastMonth ? 'style="background-color: #e2e3e5 !important;"' : '';
+            // 4. 表頭
             let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}${historyBadge}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
@@ -1273,11 +1261,14 @@
             tbody.innerHTML = '';
             
             state.staff.forEach((emp, empIdx) => {
+                // 📌 核心關鍵：自動回溯統計該月份之前的所有歷史消耗
+                let hist = getHistoricalStats(emp, year, month);
+                let startAL = (Number(emp.baseAL) || 0) - hist.prevUsedAL;
+                let startCL = (Number(emp.baseCL) || 0) + hist.prevEarnedOT - hist.prevUsedCL;
+
                 let realOff = 0, usedAL = 0, usedCL = 0, earnedOT = 0;
-                
-                // 💡 補休時序防呆追蹤池：初始為人員基礎補休時數
-                let runningCLBalance = Number(emp.baseCL) || 0;
-                let hasTimingError = false; // 是否發生「未加班先補休」時序異常
+                let runningCLBalance = startCL; // 從結轉進來的補休餘額開始跑每日時序
+                let hasTimingError = false;
 
                 let valUi = '';
                 if (validationResults && validationResults[emp.uid || emp.id]) {
@@ -1318,13 +1309,10 @@
                         usedCL += dailyCL;
                         earnedOT += dailyOT;
 
-                        // 💡 補休 1:1 時序防呆演算法：當天加班先入池，補休後扣除
-                        runningCLBalance += dailyOT; // 加班 1:1 增加可用補休
-                        runningCLBalance -= dailyCL; // 扣除當日補休
-
-                        if (runningCLBalance < 0) {
-                            hasTimingError = true; // 餘額不足扣抵，標記時序異常
-                        }
+                        // 每日時序檢核：加班先入池，補休後扣除
+                        runningCLBalance += dailyOT;
+                        runningCLBalance -= dailyCL;
+                        if (runningCLBalance < 0) hasTimingError = true;
                     }
 
                     shiftRow += `<td class="day-col" style="${styleStr}">
@@ -1339,8 +1327,10 @@
                 }
 
                 realOff += (usedAL + usedCL) / 8;
-                let remAL = (Number(emp.baseAL) || 0) - usedAL;
-                let finalRemCL = (Number(emp.baseCL) || 0) + earnedOT - usedCL;
+                
+                // 💡 正確的跨月結轉剩餘時數
+                let remAL = startAL - usedAL;
+                let finalRemCL = startCL + earnedOT - usedCL;
 
                 if (showReal) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff"><strong>${realOff}</strong></td>`;
                 if (showTarget) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${totalOffTarget}</td>`;
@@ -1348,7 +1338,6 @@
                 if (showOT) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${earnedOT > 0 ? `<span class="text-success">${earnedOT}</span>` : '0'}</td>`;
                 if (showRemAL) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${remAL < 0 ? `<span class="text-danger">${remAL}</span>` : remAL}</td>`;
                 
-                // 💡 剩餘補休欄位（若時序異常或透支呈現紅字）
                 if (showRemCL) {
                     let clDisplay = finalRemCL;
                     if (hasTimingError) {
@@ -1380,7 +1369,6 @@
             for(let i = 1; i <= daysInMonth; i++) {
                 let d = new Date(year, month - 1, i).getDay();
                 let dayClass = (d === 0) ? 'day-sun' : (d === 6) ? 'day-sat' : '';
-                
                 footDateRow += `<th class="day-col ${dayClass}" style="background-color: var(--date-bg) !important;">${i}</th>`;
                 footDayRow += `<th class="day-col ${dayClass}" style="background-color: var(--week-bg) !important;">${weekDays[d]}</th>`;
             }
@@ -1391,7 +1379,6 @@
             }
             footDateRow += `</tr>`;
             footDayRow += `</tr>`;
-
             footHtml += footDateRow + footDayRow;
 
             classesToCount.forEach(cls => {
@@ -1410,9 +1397,7 @@
                         let map = state.shiftMap.find(m => m.key === s && m.pos === staffMember.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
                         if (map) {
                             let coveredSlots = (map.cover || '').split(',').map(x => x.trim().toUpperCase());
-                            if (coveredSlots.includes(cls) || s.startsWith(cls)) {
-                                count++;
-                            }
+                            if (coveredSlots.includes(cls) || s.startsWith(cls)) count++;
                         }
                     });
 
@@ -1420,9 +1405,7 @@
                     footHtml += `<td class="day-col" style="${textStyle}">${count}</td>`;
                 }
                 
-                if (extraColCount > 0) {
-                    footHtml += `<td colspan="${extraColCount}"></td>`;
-                }
+                if (extraColCount > 0) footHtml += `<td colspan="${extraColCount}"></td>`;
                 footHtml += `</tr>`;
             });
 

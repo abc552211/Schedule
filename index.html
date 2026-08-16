@@ -296,6 +296,13 @@
     background-color: #e2e8f0 !important; /* 歷史月份表頭轉為柔和灰 */
     color: #475569 !important;
 }
+/* 💡 按鈕鎖定狀態樣式：變灰、半透明、禁用手勢 */
+button:disabled, input:disabled, select:disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+    filter: grayscale(80%) !important;
+    pointer-events: none !important;
+}
     </style>
 </head>
 <body>
@@ -308,23 +315,30 @@
     <div class="top-navbar">
         <h2 id="systemTitle" style="margin: 0; font-size: 18px;">排班與人力控管系統 - 南崁中正</h2>
         <div style="display: flex; align-items: center; gap: 6px;">
-    <!-- 💡 重新整理按鈕 (純圖示、無邊框) -->
-    <button type="button" style="background: transparent; border: none; color: white; padding: 0; font-size: 15px; margin: 0 2px 0 0; cursor: pointer; line-height: 1; vertical-align: middle;" onclick="reloadCurrentStoreData()" title="重新讀取雲端資料">🔄</button>
-    <label style="font-weight:bold;">套用門市:</label>
-<span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
-<select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
-    <option value="南崁中正">南崁中正</option>
-</select>
-<button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
-<button id="addStoreBtn" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px; display: none;" onclick="addNewStore('9512369')">➕ 新增門市</button>
-<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()">🔑 改密碼</button>
-<button class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
+            <!-- 💡 重新整理按鈕 -->
+            <button id="btnReload" type="button" style="background: transparent; border: none; color: white; padding: 0; font-size: 15px; margin: 0 2px 0 0; cursor: pointer; line-height: 1; vertical-align: middle;" onclick="reloadCurrentStoreData()" title="重新讀取雲端資料" disabled>🔄</button>
+            
+            <label style="font-weight:bold;">套用門市:</label>
+            <span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
+            <select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
+                <option value="南崁中正">南崁中正</option>
+            </select>
+            
+            <!-- 🔐 登入按鈕 (唯一保持啟用) -->
+            <button id="btnLogin" class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
+            
+            <!-- 功能按鈕群 (未登入預設全數 disabled 鎖死) -->
+            <button id="addStoreBtn" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px; display: none;" onclick="addNewStore('9512369')">➕ 新增門市</button>
+            <button id="btnChangePwd" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()" disabled>🔑 改密碼</button>
+            <button id="btnChangeCat" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()" disabled>🏷️ 改類別</button>
+            
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
-            <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
-            <button class="btn btn-primary" onclick="saveToCloud()">儲存</button>
-            <button class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">寫入工作網站</button>
-            <button class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰</button>
-            <button class="btn btn-line" onclick="captureAndCopyForLine()">📥下載班表</button>
+            <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;" disabled>
+            
+            <button id="btnSave" class="btn btn-primary" onclick="saveToCloud()" disabled>儲存</button>
+            <button id="btnSyncWeb" class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()" disabled>寫入工作網站</button>
+            <button id="btnExportFeiTeng" class="btn btn-success" onclick="exportFeiTengExcel()" disabled>匯出飛騰</button>
+            <button id="btnDownloadSchedule" class="btn btn-line" onclick="captureAndCopyForLine()" disabled>📥下載班表</button>
         </div>
     </div>
 
@@ -693,6 +707,11 @@
         }
 
         async function captureAndCopyForLine() {
+            // 範例：在 saveToCloud、syncToGoogleSheetAndSupabase、exportFeiTengExcel、captureAndCopyForLine 開頭：
+const activeStore = document.getElementById('globalStore').value || "南崁中正";
+if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
+    return alert(`🛑【操作已鎖定】\n\n您目前尚未登入【${activeStore}】！\n請先點擊【🔐 登入】按鈕完成密碼驗證。`);
+}
             const hideAlert = confirm("截圖是否要【隱藏】上方的【人力提示】？\n\n・按「確定」：隱藏人力提示\n・按「取消」：顯示人力提示");
             
             showLoading("正在生成高畫質班表截圖...");
@@ -854,6 +873,7 @@
                 if (!targetStoreName) {
                     if (overlay) overlay.style.display = 'flex';
                     checkAddStoreButtonVisibility(); // 👈 未登入時確保隱藏
+                    updateTopNavbarLockState(); // 👈 未登入時確保全數鎖定
                     hideLoading();
                     return; 
                 }
@@ -912,6 +932,7 @@
                     // 🔓 登入成功：隱藏霧面遮罩
                     if (overlay) overlay.style.display = 'none';
                     applyDataToState(data, targetStoreName);
+                    updateTopNavbarLockState(); // 👈 登入成功後解鎖按鈕
                     showToast(`【${targetStoreName}】資料登入成功！`);
                 } else {
                     if (overlay) overlay.style.display = 'none';
@@ -926,9 +947,26 @@
             }
         }
 
-        // 💡 終極安全版 saveToCloud：保留期初基準額度，杜絕「重複儲存重複扣除」！
+        // 💡 終極安全版 saveToCloud：加入「未登入強制阻擋」防呆，絕不允許空白覆蓋！
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            
+            // 🔒 核心防呆：未通過該門市驗證登入，絕對禁止執行儲存！
+            const hasPermission = authenticatedStores.includes(activeStore) || isMasterAdminAuthenticated;
+            if (!hasPermission) {
+                alert(`🛑【系統強制阻擋儲存】\n\n您目前尚未登入【${activeStore}】！\n為避免未載入的空白資料覆蓋雲端，請先點擊上方【🔐 登入】按鈕完成密碼驗證。`);
+                return;
+            }
+
+            // 🔒 第二道防線：防範空資料覆蓋（如果員工與班別皆為空，要求二次確認）
+            if ((!state.staff || state.staff.length === 0) && (!state.shiftMap || state.shiftMap.length === 0)) {
+                const confirmEmptySave = confirm(`⚠️【空白資料警示】\n\n目前【${activeStore}】的人員與班別設定皆為空白！\n確定要將這份「完全空白」的狀態儲存覆蓋至雲端嗎？`);
+                if (!confirmEmptySave) {
+                    showToast("已取消儲存");
+                    return;
+                }
+            }
+
             const dateVal = document.getElementById('schedule-month').value;
             
             // 💡 歷史月份儲存防呆警示
@@ -947,12 +985,12 @@
                 }
             }
 
-            showLoading(`正在將【${activeStore}】寫入 Firebase...`);
+            showLoading(`正在將【${activeStore}】安全寫入 Firebase...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
 
-            // 整理班表資料與 UID，絕不竄改 baseAL / baseCL 基礎額度
+            // 整理班表資料與 UID
             state.staff.forEach((emp, idx) => {
                 if (!emp.uid) {
                     emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
@@ -2159,6 +2197,11 @@
         }
         // 💡 升級版：使用 SheetJS 產生飛騰系統完全相容的「真・Excel 檔案」
         function exportFeiTengExcel() {
+            // 範例：在 saveToCloud、syncToGoogleSheetAndSupabase、exportFeiTengExcel、captureAndCopyForLine 開頭：
+const activeStore = document.getElementById('globalStore').value || "南崁中正";
+if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
+    return alert(`🛑【操作已鎖定】\n\n您目前尚未登入【${activeStore}】！\n請先點擊【🔐 登入】按鈕完成密碼驗證。`);
+}
             const dateVal = document.getElementById('schedule-month').value;
             const globalStore = document.getElementById('globalStore').value;
             const sheetName = document.getElementById('sheetName').value || 'ATT0020200';
@@ -2325,6 +2368,39 @@
                 });
             }
         }
+        // 🔒 頂部所有功能按鈕鎖定/解鎖控制器
+        function updateTopNavbarLockState() {
+            const storeSelect = document.getElementById('globalStore');
+            const currentStore = storeSelect ? storeSelect.value : "";
+            const isAuthed = isMasterAdminAuthenticated || authenticatedStores.includes(currentStore);
+
+            // 需要被鎖定的按鈕清單
+            const lockableIds = [
+                'btnReload', 'btnChangePwd', 'btnChangeCat', 'sheetName',
+                'btnSave', 'btnSyncWeb', 'btnExportFeiTeng', 'btnDownloadSchedule'
+            ];
+
+            lockableIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = !isAuthed;
+            });
+
+            // 登入按鈕文字提示切換
+            const loginBtn = document.getElementById('btnLogin');
+            if (loginBtn) {
+                if (isAuthed) {
+                    loginBtn.innerText = "🔓 已登入";
+                    loginBtn.classList.remove('btn-primary');
+                    loginBtn.classList.add('btn-success');
+                } else {
+                    loginBtn.innerText = "🔐 登入";
+                    loginBtn.classList.remove('btn-success');
+                    loginBtn.classList.add('btn-primary');
+                }
+            }
+
+            checkAddStoreButtonVisibility();
+        }
         // 💡 僅在成功登入【南崁中正】時才顯示「➕ 新增門市」按鈕
         function checkAddStoreButtonVisibility() {
             const storeSelect = document.getElementById('globalStore');
@@ -2417,8 +2493,11 @@
             }
         }
         async function syncToGoogleSheetAndSupabase() {
-            const activeStore = document.getElementById('globalStore').value || "南崁中正";
             
+            const activeStore = document.getElementById('globalStore').value || "南崁中正";
+            if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
+    return alert(`🛑【操作已鎖定】\n\n您目前尚未登入【${activeStore}】！\n請先點擊【🔐 登入】按鈕完成密碼驗證。`);
+}
             if (activeStore !== "南崁中正") {
                 alert(`⚠️【南崁中正限定功能】\n目前選擇的門市為【${activeStore}】，寫入工作網站功能僅限【南崁中正】使用！`);
                 return;
@@ -2974,6 +3053,7 @@
             const lockMsg = document.getElementById('authLockMsg');
 
             checkAddStoreButtonVisibility();
+            updateTopNavbarLockState(); // 👈 切換門市時立即更新鎖定狀態
 
             // 👑 若已取得總管理權限，切換任何門市都不再跳出遮罩，直接秒切入讀取
             if (isMasterAdminAuthenticated || authenticatedStores.includes(storeName)) {

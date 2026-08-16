@@ -287,6 +287,15 @@
             from { opacity: 0; transform: translateY(-15px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* 💡 歷史過往月份：班表呈現柔和低飽和度灰調，防止誤認為當前月份 */
+.past-month-table {
+    filter: grayscale(25%);
+    background-color: #fafafa;
+}
+.past-month-table thead tr.header-date-row th {
+    background-color: #e2e8f0 !important; /* 歷史月份表頭轉為柔和灰 */
+    color: #475569 !important;
+}
     </style>
 </head>
 <body>
@@ -393,7 +402,7 @@
                 </div>
 
                 <!-- 右側：顯示控制欄位 -->
-                <div style="display: flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px; font-size: 11px;">
+                <div style="display: flex; align-items: center; gap: 4px; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px; font-size: 11px;">
                     <strong style="color: #333;">顯示:</strong>
                     <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColAlert" checked onchange="toggleColumns()"> 提示</label>
                     <span style="color: #ccc;">|</span>
@@ -402,6 +411,7 @@
                     <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColAL" checked onchange="toggleColumns()"> 特休</label>
                     <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColOT" checked onchange="toggleColumns()"> 加班</label>
                     <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColRemAL" checked onchange="toggleColumns()"> 剩特休</label>
+                    <label style="cursor: pointer; margin: 0;"><input type="checkbox" id="showColRemCL" checked onchange="toggleColumns()"> 剩補休</label>
                 </div>
 
             </div>
@@ -916,28 +926,76 @@
             }
         }
 
-        // 💡 升級版 saveToCloud：加入隱藏 uid 機制，允許員工編號完全留空
+        // 💡 升級版 saveToCloud：儲存時自動將當月班表的特休/補休/加班結算進人員基礎數值
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
-            showLoading(`正在將【${activeStore}】寫入 Firebase...`);
+            const dateVal = document.getElementById('schedule-month').value;
+            
+            if (!dateVal) return alert("請先選擇排班年月！");
+
+            const [year, month] = dateVal.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            // 💡 歷史月份儲存防呆警示
+            const now = new Date();
+            const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
+            const selectedYearMonth = year * 12 + month;
+
+            if (selectedYearMonth < currentYearMonth) {
+                const confirmPastSave = confirm(`⚠️【歷史月份儲存警告】\n\n您目前正在儲存【${year}年${month}月】（過往歷史月份）的班表！\n修改過往班表可能會導致人員特休、補休及加班累計產生時間序誤差。\n\n確定仍要覆蓋儲存此歷史班表嗎？`);
+                if (!confirmPastSave) {
+                    showToast("已取消儲存");
+                    return;
+                }
+            }
+
+            showLoading(`正在將【${activeStore}】寫入 Firebase 並自動結算人員基礎時數...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
-            
+
+            // 📌 核心機制：逐一結算每位員工的當月時數消耗與累計
             state.staff.forEach((emp, idx) => {
-                // 📌 核心修正：為每位員工配發底層專屬 uid (若無則建立)，取代原本用來當 Key 的 emp.id
                 if (!emp.uid) {
                     emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
                 }
-                
+
                 scheduleShifts[emp.uid] = emp.shifts || {};
                 scheduleRemarks[emp.uid] = emp.remarks || {};
+
+                // 統計該員工在當選定月份內所使用的特休、補休與產生的加班
+                let monthUsedAL = 0;
+                let monthUsedCL = 0;
+                let monthEarnedOT = 0;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateKey = `${year}-${month}-${d}`;
+                    const s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey] : '';
+                    
+                    if (s) {
+                        const map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                        if (map) {
+                            monthUsedAL += (Number(map.al) || 0);
+                            monthUsedCL += (Number(map.cl) || 0);
+                            monthEarnedOT += (Number(map.ot) || 0);
+                        }
+                    }
+                }
+
+                // 💡 1. 剩餘特休結算入人員基本資料
+                emp.baseAL = (Number(emp.baseAL) || 0) - monthUsedAL;
+
+                // 💡 2. 剩餘補休結算入人員基本資料 (加班 1:1 增加，補休 1:1 扣除)
+                emp.baseCL = (Number(emp.baseCL) || 0) + monthEarnedOT - monthUsedCL;
+
+                // 💡 3. 加班累計純累加，不參與扣除
+                emp.baseOT = (Number(emp.baseOT) || 0) + monthEarnedOT;
             });
 
             const payload = {
                 storeKey: activeStore,
                 storePassword: storePasswords[activeStore] || "1234",
-                storeCategory: (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市", // 👈 新增寫入店家類別
+                storeCategory: (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市",
                 staff: state.staff,
                 shiftMap: state.shiftMap,
                 manpower: state.manpower,
@@ -949,7 +1007,9 @@
 
             try {
                 await db.collection("stores").doc(activeStore).set(payload, { merge: true });
-                showToast(`【${activeStore}】資料與密碼成功儲存至 Firebase！`);
+                renderStaff();    // 立即更新人員設定表格上的數值
+                renderSchedule(); // 重新渲染班表畫面
+                showToast(`🎉【${activeStore}】儲存成功！人員特休/補休/加班時數已同步結算更新！`);
             } catch (err) {
                 console.error("Firebase 儲存失敗:", err);
                 alert("儲存至 Firebase 失敗：" + err.message);
@@ -1044,8 +1104,29 @@
             const daysInMonth = new Date(year, month, 0).getDate();
             const formattedMonthStr = `${year} / ${String(month).padStart(2, '0')}`;
             
+            // 💡 判斷是否為過往月份 (歷史月份防誤判)
+            const now = new Date();
+            const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
+            const selectedYearMonth = year * 12 + month;
+            const isPastMonth = selectedYearMonth < currentYearMonth;
+
+            // 💡 依據是否為過去月份，動態替換表格的灰階樣式 (安全掛載)
+            const schedTable = document.getElementById('scheduleTable');
+            if (schedTable) {
+                if (isPastMonth) {
+                    schedTable.classList.add('past-month-table');
+                } else {
+                    schedTable.classList.remove('past-month-table');
+                }
+            }
+            
+            
+            
+
             const activeStoreName = document.getElementById('globalStore') ? document.getElementById('globalStore').value : "南崁中正";
             const activeStoreCat = (state.storeCategories && state.storeCategories[activeStoreName]) ? state.storeCategories[activeStoreName] : "門市";
+            
+            const historyBadge = isPastMonth ? `<div style="font-size:9px; background:#6c757d; color:#fff; border-radius:2px; padding:1px 3px; display:inline-block; margin-top:2px;">📜 歷史存檔</div>` : '';
             const storeTitleDisplay = `<div style="font-size:11px; color:#0070c0; font-weight:bold; margin-bottom:2px;">${activeStoreName}</div>`;
 
             // 計算目標應有例休國
@@ -1069,10 +1150,11 @@
             const showAL = document.getElementById('showColAL') ? document.getElementById('showColAL').checked : true;
             const showOT = document.getElementById('showColOT') ? document.getElementById('showColOT').checked : true;
             const showRemAL = document.getElementById('showColRemAL') ? document.getElementById('showColRemAL').checked : true;
+            const showRemCL = document.getElementById('showColRemCL') ? document.getElementById('showColRemCL').checked : true;
 
-            let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0);
+            let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0) + (showRemCL?1:0);
 
-            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架 (姓名欄 70px、日期欄 24px、統計欄 25px)
+            // 📌 核心關鍵 1：動態產生 <colgroup> 欄寬骨架
             let colgroupHtml = `<col class="col-name" style="width: 70px; min-width: 70px; max-width: 80px;">`;
             for(let i = 1; i <= daysInMonth; i++) {
                 colgroupHtml += `<col class="col-day" style="width: 24px; min-width: 24px; max-width: 24px;">`;
@@ -1082,6 +1164,7 @@
             if (showAL) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
             if (showOT) colgroupHtml += `<col style="width: 25px; min-width: 25px; max-width: 25px;">`;
             if (showRemAL) colgroupHtml += `<col style="width: 28px; min-width: 28px; max-width: 28px;">`;
+            if (showRemCL) colgroupHtml += `<col style="width: 28px; min-width: 28px; max-width: 28px;">`;
 
             let tableElement = document.getElementById('scheduleTable');
             let existingColgroup = tableElement.querySelector('colgroup');
@@ -1091,7 +1174,7 @@
             let thead = document.getElementById('scheduleHead');
             if (!thead) return;
             
-            // 1. 人力提示列（最右側不再放紅字提示，改留白）
+            // 1. 人力提示列
             let alertRow = '';
             if (showAlert) {
                 alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
@@ -1130,7 +1213,7 @@
                 alertRow += `</tr>`;
             }
 
-            // 2. 警告標語列保持原樣
+            // 2. 警告標語列
             let row1 = `<tr style="background-color: #fff3cd; color: #856404; font-weight: bold; font-size: 11px;">
                 <td class="name-col" style="font-size: 11px; color: #856404; background-color: #fff3cd;">提醒事項</td>
                 <td colspan="${daysInMonth}" style="text-align: left; padding: 4px 8px; background-color: #fff3cd;">
@@ -1141,7 +1224,7 @@
             }
             row1 += `</tr>`;
 
-            // 💡 3. 全店備註列：最右側放入 [ 4例 4休 2國 ]（深灰色、字體略細、垂直水平置中）
+            // 3. 全店備註列
             let row2 = `<tr style="background-color: #f9f9f9;">
                 <td class="name-col" style="font-size: 11px; font-weight: bold; color: #555;">備註</td>`;
             for(let i=1; i<=daysInMonth; i++) {
@@ -1163,7 +1246,8 @@
             row2 += `</tr>`;
 
             // 4. 日期與星期表頭列
-            let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}</th>`;
+            let dateRowBg = isPastMonth ? 'style="background-color: #e2e3e5 !important;"' : '';
+            let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}${historyBadge}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
                 let d = new Date(year, month-1, i).getDay();
@@ -1177,6 +1261,7 @@
             if (showAL) dateRow += `<th rowspan="2" class="stat-col">特休</th>`;
             if (showOT) dateRow += `<th rowspan="2" class="stat-col">加班</th>`;
             if (showRemAL) dateRow += `<th rowspan="2" class="stat-col">剩餘<br>特休</th>`;
+            if (showRemCL) dateRow += `<th rowspan="2" class="stat-col" style="color:#0d6efd;">剩餘<br>補休</th>`;
 
             dateRow += `</tr>`;
             dayRow += `</tr>`;
@@ -1190,6 +1275,10 @@
             state.staff.forEach((emp, empIdx) => {
                 let realOff = 0, usedAL = 0, usedCL = 0, earnedOT = 0;
                 
+                // 💡 補休時序防呆追蹤池：初始為人員基礎補休時數
+                let runningCLBalance = Number(emp.baseCL) || 0;
+                let hasTimingError = false; // 是否發生「未加班先補休」時序異常
+
                 let valUi = '';
                 if (validationResults && validationResults[emp.uid || emp.id]) {
                     if (validationResults[emp.uid || emp.id].ok) {
@@ -1221,9 +1310,21 @@
                     let styleStr = map ? `color:${map.textColor}; background-color:${map.bgColor};` : '';
                     
                     if (map) {
-                        usedAL += (Number(map.al) || 0);
-                        usedCL += (Number(map.cl) || 0);
-                        earnedOT += (Number(map.ot) || 0);
+                        let dailyAL = Number(map.al) || 0;
+                        let dailyCL = Number(map.cl) || 0;
+                        let dailyOT = Number(map.ot) || 0;
+
+                        usedAL += dailyAL;
+                        usedCL += dailyCL;
+                        earnedOT += dailyOT;
+
+                        // 💡 補休 1:1 時序防呆演算法：當天加班先入池，補休後扣除
+                        runningCLBalance += dailyOT; // 加班 1:1 增加可用補休
+                        runningCLBalance -= dailyCL; // 扣除當日補休
+
+                        if (runningCLBalance < 0) {
+                            hasTimingError = true; // 餘額不足扣抵，標記時序異常
+                        }
                     }
 
                     shiftRow += `<td class="day-col" style="${styleStr}">
@@ -1239,12 +1340,24 @@
 
                 realOff += (usedAL + usedCL) / 8;
                 let remAL = (Number(emp.baseAL) || 0) - usedAL;
+                let finalRemCL = (Number(emp.baseCL) || 0) + earnedOT - usedCL;
 
                 if (showReal) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff"><strong>${realOff}</strong></td>`;
                 if (showTarget) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${totalOffTarget}</td>`;
                 if (showAL) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${usedAL > 0 ? `<span class="text-warning">${usedAL}</span>` : '0'}</td>`;
                 if (showOT) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${earnedOT > 0 ? `<span class="text-success">${earnedOT}</span>` : '0'}</td>`;
                 if (showRemAL) shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff">${remAL < 0 ? `<span class="text-danger">${remAL}</span>` : remAL}</td>`;
+                
+                // 💡 剩餘補休欄位（若時序異常或透支呈現紅字）
+                if (showRemCL) {
+                    let clDisplay = finalRemCL;
+                    if (hasTimingError) {
+                        clDisplay = `<span class="text-danger" title="⚠️ 補休時序異常：未先加班即提早透支補休！">${finalRemCL}⚠️</span>`;
+                    } else if (finalRemCL < 0) {
+                        clDisplay = `<span class="text-danger">${finalRemCL}</span>`;
+                    }
+                    shiftRow += `<td rowspan="2" class="stat-col" style="background:#fff; font-weight:bold;">${clDisplay}</td>`;
+                }
                 
                 shiftRow += `</tr>`;
                 remarkRow += `</tr>`;

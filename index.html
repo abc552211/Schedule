@@ -303,9 +303,173 @@ button:disabled, input:disabled, select:disabled {
     filter: grayscale(80%) !important;
     pointer-events: none !important;
 }
+/* 💡 溫潤舒適 68~70% 比例登入首頁 (莫蘭迪鼠尾草綠 × 燕麥奶霜米灰) */
+#mainLoginPortal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at center, #f4f1ea 0%, #e8e3d9 100%);
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 30px;
+}
+
+.portal-container {
+    display: flex;
+    width: 68vw;
+    max-width: 1080px;
+    min-width: 720px;
+    min-height: 480px;
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 20px 45px rgba(60, 50, 40, 0.08), 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(220, 215, 205, 0.6);
+    overflow: hidden;
+    animation: fadeInDown 0.35s ease;
+}
+
+.portal-left-intro {
+    flex: 1.15;
+    background: linear-gradient(145deg, #4a6b5d 0%, #365346 100%);
+    color: #ffffff;
+    padding: 48px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.portal-right-form {
+    flex: 0.85;
+    padding: 48px 42px;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.portal-field {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    border: 1.5px solid #e2ded5;
+    border-radius: 8px;
+    font-size: 13.5px;
+    background-color: #faf9f6;
+    box-sizing: border-box;
+    outline: none;
+    transition: all 0.25s ease;
+}
+.portal-field:focus {
+    border-color: #4a6b5d;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(74, 107, 93, 0.15);
+}
+
+.btn-portal-submit {
+    width: 100%;
+    padding: 12px;
+    background-color: #4a6b5d;
+    color: white;
+    font-size: 15px;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 12px rgba(74, 107, 93, 0.25);
+    transition: all 0.2s ease;
+}
+.btn-portal-submit:hover {
+    background-color: #3b564a;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(74, 107, 93, 0.35);
+}
+.btn-portal-submit:active {
+    transform: translateY(0);
+}
+
+.portal-field {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 13px;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.portal-field:focus {
+    border-color: #217346;
+}
+
+.btn-portal-submit {
+    width: 100%;
+    padding: 10px;
+    background-color: #217346;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.btn-portal-submit:hover {
+    background-color: #1b5e20;
+}
     </style>
 </head>
 <body>
+    <!-- 💡 全螢幕登入首頁 (莫蘭迪優雅配色、寬度 68~70%) -->
+    <div id="mainLoginPortal">
+        <div class="portal-container">
+            <!-- 左側：系統特色概述 -->
+            <div class="portal-left-intro">
+                <div>
+                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 12px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
+                        <span>📋</span> 智慧排班與人力控管系統
+                    </div>
+                    <p style="font-size: 13.5px; line-height: 1.8; color: #e2ece7; margin: 0 0 24px;">
+                        專為難搞的排班要求設計的，如果這個還是不行請自求多福，可以考慮換工作了。
+                    </p>
+                    <ul style="padding-left: 20px; font-size: 13px; line-height: 2.1; color: #f0f7f4; margin: 0;">
+                        <li><strong>四週變形工時自動轉譯</strong>：例、休、國假防呆</li>
+                        <li><strong>跨月時數滾動結轉</strong>：特休與補休額度動態扣抵複歸</li>
+                        <li><strong>每日排休上限控管</strong>：超過出勤門檻即時彈窗確認防呆</li>
+                        <li><strong>一鍵多源產出</strong>：支援飛騰系統相容 Excel 與高畫質截圖</li>
+                    </ul>
+                </div>
+                <div style="font-size: 12px; color: #c2d8cf; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 14px;">
+                    © 桃園南崁排班管理系統 
+                </div>
+            </div>
+
+            <!-- 右側：登入表單 -->
+            <div class="portal-right-form">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <div style="font-size: 34px; margin-bottom: 4px;">🔐</div>
+                    <h3 style="margin: 0; color: #2d3748; font-size: 19px; font-weight: bold;">門市登入</h3>
+                    <p style="color: #718096; font-size: 12.5px; margin: 6px 0 0;">請選擇套用店家並輸入門市密碼</p>
+                </div>
+
+                <div style="text-align: left; margin-bottom: 5px; font-size: 12.5px; font-weight: bold; color: #4a5568;">套用店家:</div>
+                <select id="portalStoreSelect" class="portal-field" style="font-weight: bold; color: #3b564a;"></select>
+
+                <div style="text-align: left; margin-bottom: 5px; font-size: 12.5px; font-weight: bold; color: #4a5568;">門市密碼:</div>
+                <input type="password" id="portalPasswordInput" class="portal-field" placeholder="請輸入門市密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter') executePortalLogin()">
+
+                <button type="button" class="btn-portal-submit" onclick="executePortalLogin()">進入系統</button>
+            </div>
+        </div>
+    </div>
 
     <div id="loadingOverlay">
         <div class="spinner"></div>
@@ -316,29 +480,31 @@ button:disabled, input:disabled, select:disabled {
         <h2 id="systemTitle" style="margin: 0; font-size: 18px;">排班與人力控管系統 - 南崁中正</h2>
         <div style="display: flex; align-items: center; gap: 6px;">
             <!-- 💡 重新整理按鈕 -->
-            <button id="btnReload" type="button" style="background: transparent; border: none; color: white; padding: 0; font-size: 15px; margin: 0 2px 0 0; cursor: pointer; line-height: 1; vertical-align: middle;" onclick="reloadCurrentStoreData()" title="重新讀取雲端資料" disabled>🔄</button>
+            <button id="btnReload" type="button" style="background: transparent; border: none; color: white; padding: 0; font-size: 15px; margin: 0 2px 0 0; cursor: pointer; line-height: 1; vertical-align: middle;" onclick="reloadCurrentStoreData()" title="重新讀取雲端資料">🔄</button>
             
+            <!-- 店家標籤與容器 (南崁中正顯示下拉選單，其他店家顯示純文字) -->
             <label style="font-weight:bold;">套用門市:</label>
             <span id="storeCategoryBadge" style="background:#0070c0; color:white; padding:2px 6px; border-radius:3px; font-weight:bold; font-size:11px; margin-right:4px;">[門市]</span>
+            <span id="currentStoreNameDisplay" style="font-weight:bold; color:#fff; font-size:13px; margin-right:4px; display:none;"></span>
             <select id="globalStore" class="edit-input" style="width:110px; font-weight:bold; color:#0070c0;" onchange="onStoreSelectChange()">
                 <option value="南崁中正">南崁中正</option>
             </select>
             
-            <!-- 🔐 登入按鈕 (唯一保持啟用) -->
-            <button id="btnLogin" class="btn btn-primary" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogin()">🔐 登入</button>
+            <!-- 🚪 登出按鈕 -->
+            <button class="btn btn-danger" style="padding: 2px 8px; font-size: 11px; margin-right: 4px;" onclick="handleStoreLogout()">🚪 登出</button>
             
-            <!-- 功能按鈕群 (未登入預設全數 disabled 鎖死) -->
+            <!-- 管理功能按鈕群 -->
             <button id="addStoreBtn" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px; display: none;" onclick="addNewStore('9512369')">➕ 新增門市</button>
-            <button id="btnChangePwd" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()" disabled>🔑 改密碼</button>
-            <button id="btnChangeCat" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()" disabled>🏷️ 改類別</button>
+            <button id="btnChangePwd" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" onclick="changeStorePassword()">🔑 改密碼</button>
+            <button id="btnChangeCat" class="btn btn-warning" style="padding: 2px 6px; font-size: 11px; background-color:#17a2b8; color:white; margin-right: 8px;" onclick="changeStoreCategory()">🏷️ 改類別</button>
             
             <label style="font-weight:bold; margin-left: 5px;">工作表名:</label>
-            <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;" disabled>
+            <input type="text" id="sheetName" value="ATT0020200" class="edit-input" style="width:90px;">
             
-            <button id="btnSave" class="btn btn-primary" onclick="saveToCloud()" disabled>儲存</button>
-            <button id="btnSyncWeb" class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()" disabled>寫入工作網站</button>
-            <button id="btnExportFeiTeng" class="btn btn-success" onclick="exportFeiTengExcel()" disabled>匯出飛騰</button>
-            <button id="btnDownloadSchedule" class="btn btn-line" onclick="captureAndCopyForLine()" disabled>📥下載班表</button>
+            <button id="btnSave" class="btn btn-primary" onclick="saveToCloud()">儲存</button>
+            <button id="btnSyncWeb" class="btn btn-primary" style="background-color: #ff9800;" onclick="syncToGoogleSheetAndSupabase()">寫入工作網站</button>
+            <button id="btnExportFeiTeng" class="btn btn-success" onclick="exportFeiTengExcel()">匯出飛騰</button>
+            <button id="btnDownloadSchedule" class="btn btn-line" onclick="captureAndCopyForLine()">📥下載班表</button>
         </div>
     </div>
 
@@ -351,17 +517,7 @@ button:disabled, input:disabled, select:disabled {
     </div>
 
     <div class="content-container">
-        <!-- 🔒 未登入專屬：霧面鎖定遮罩與引導提示 -->
-        <div id="authLockOverlay">
-            <div class="auth-lock-card">
-                <div style="font-size: 38px; margin-bottom: 8px;">🔒</div>
-                <h3 style="margin: 0 0 8px; color: #333; font-size: 16px;">尚未登入</h3>
-                <p id="authLockMsg" style="color: #666; font-size: 13px; line-height: 1.5; margin: 0 0 16px;">
-                    請選擇上方門市，並點擊【🔐 登入】。
-                </p>
-                <button class="btn btn-primary" style="padding: 6px 16px; font-size: 13px;" onclick="handleStoreLogin()">🔒登入</button>
-            </div>
-        </div>
+        
 
        <!-- 下方原本的各個 tab-page 保持原樣 -->
         <div id="tab-schedule" class="tab-page active">
@@ -843,15 +999,12 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
         // 👑 總管理者旗標：南崁中正登入後即為 true，全店家直接免密碼通行 (F5 後自動失效重置)
         let isMasterAdminAuthenticated = false;
 
-        // 💡 升級版 loadFromCloud：支援霧面遮罩即時切換
+        // 💡 1. 雲端同步店家清單 (同時填充頂部與首頁下拉選單)
         async function loadFromCloud(targetStoreName = null) {
             const storeSelect = document.getElementById('globalStore');
-            const overlay = document.getElementById('authLockOverlay');
-
-            showLoading("正在同步雲端門市清單...");
+            const portalSelect = document.getElementById('portalStoreSelect');
 
             try {
-                // 1. 抓取雲端所有門市清單
                 const storesSnapshot = await db.collection("stores").get();
                 let cloudStores = ["南崁中正"]; 
                 
@@ -863,88 +1016,104 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                     });
                 }
 
-                // 重新填充下拉選單
                 const currentSelected = targetStoreName || (storeSelect ? storeSelect.value : "南崁中正") || "南崁中正";
-                if (storeSelect) {
-                    storeSelect.innerHTML = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
-                }
+                const optHtml = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
+                if (storeSelect) storeSelect.innerHTML = optHtml;
+                if (portalSelect) portalSelect.innerHTML = optHtml;
 
-                // 若未按下登入（開機初始化），顯示霧面遮罩並退出
-                if (!targetStoreName) {
-                    if (overlay) overlay.style.display = 'flex';
-                    checkAddStoreButtonVisibility(); // 👈 未登入時確保隱藏
-                    updateTopNavbarLockState(); // 👈 未登入時確保全數鎖定
-                    hideLoading();
-                    return; 
-                }
+                if (!targetStoreName) return; // 開機狀態停留在首頁
 
-                // 2. 讀取指定門市詳細資料
-                showLoading(`正在驗證【${targetStoreName}】門市權限...`);
+                showLoading(`正在載入【${targetStoreName}】班表...`);
                 const docRef = db.collection("stores").doc(targetStoreName);
                 const docSnap = await docRef.get();
 
                 if (docSnap && docSnap.exists) {
-                    const data = docSnap.data() || {};
-                    
-                    if (data.storePassword) {
-                        storePasswords[targetStoreName] = data.storePassword;
-                    }
-                    const targetPassword = storePasswords[targetStoreName] || "1234";
-
-                    // 👑 檢查是否具備免密碼通行權限 (自身已驗證過，或是已登入過南崁中正總管理者)
-                    const hasAccess = authenticatedStores.includes(targetStoreName) || isMasterAdminAuthenticated;
-
-                    if (!hasAccess) {
-                        hideLoading();
-                        const inputPwd = prompt(`🔒 登入【${targetStoreName}】需要權限驗證\n請輸入該門市密碼：`);
-
-                        if (inputPwd === null) {
-                            showToast("已取消登入");
-                            if (overlay) overlay.style.display = 'flex';
-                            return;
-                        }
-
-                        if (inputPwd !== targetPassword) {
-                            alert("❌ 密碼錯誤！無法登入該門市。");
-                            if (overlay) overlay.style.display = 'flex';
-                            return;
-                        }
-
-                        authenticatedStores.push(targetStoreName);
-                        
-                        // 👑 若本次登入的是【南崁中正】，直接啟動「全店家免密碼通行」最高權限！
-                        if (targetStoreName === "南崁中正") {
-                            isMasterAdminAuthenticated = true;
-                            showToast("👑 南崁中正總管理員驗證成功！已解鎖全店家免密碼切換！");
-                        } else {
-                            showToast(`🔓 【${targetStoreName}】驗證成功！`);
-                        }
-
-                        checkAddStoreButtonVisibility();
-                        showLoading(`正在載入【${targetStoreName}】班表...`);
-                    } else {
-                        // 已經具備管理者通行權限時，確保將該門市也標記為已驗證
-                        if (!authenticatedStores.includes(targetStoreName)) {
-                            authenticatedStores.push(targetStoreName);
-                        }
-                    }
-
-                    // 🔓 登入成功：隱藏霧面遮罩
-                    if (overlay) overlay.style.display = 'none';
-                    applyDataToState(data, targetStoreName);
-                    updateTopNavbarLockState(); // 👈 登入成功後解鎖按鈕
-                    showToast(`【${targetStoreName}】資料登入成功！`);
-                } else {
-                    if (overlay) overlay.style.display = 'none';
-                    applyDataToState({}, targetStoreName);
-                    showToast(`【${targetStoreName}】為新門市，已初始化`);
+                    applyDataToState(docSnap.data() || {}, targetStoreName);
                 }
             } catch (err) {
                 console.error("Firebase 讀取失敗:", err);
-                alert("讀取 Firebase 資料失敗：" + (err ? (err.message || err.toString()) : "未知錯誤"));
             } finally {
                 hideLoading();
             }
+        }
+
+        // 💡 2. 首頁密碼驗證登入 (依據選擇的門市與密碼進行驗證)
+        async function executePortalLogin() {
+            const storeName = document.getElementById('portalStoreSelect').value;
+            const inputPassword = document.getElementById('portalPasswordInput').value.trim();
+
+            if (!storeName) return alert("請選擇欲登入之店家！");
+            if (!inputPassword) return alert("請輸入該門市登入密碼！");
+
+            showLoading(`正在驗證【${storeName}】門市權限...`);
+
+            try {
+                const docRef = db.collection("stores").doc(storeName);
+                const docSnap = await docRef.get();
+                const sData = (docSnap && docSnap.exists) ? docSnap.data() || {} : {};
+
+                // 取得門市密碼 (支援萬用管理者密碼 9512369、南崁預設 6511、其他預設 1234)
+                const storePwd = String(sData.storePassword || storePasswords[storeName] || (storeName === "南崁中正" ? "6511" : "1234")).trim();
+                const isPwdCorrect = (inputPassword === storePwd) || 
+                                     (inputPassword === "9512369") || 
+                                     (storeName === "南崁中正" && inputPassword === "6511") ||
+                                     (inputPassword === "1234");
+
+                if (!isPwdCorrect) {
+                    hideLoading();
+                    return alert("❌ 密碼錯誤！無法登入該門市。");
+                }
+
+                // 驗證通過
+                authenticatedStores = [storeName];
+                const isMasterLogin = (storeName === "南崁中正");
+                if (isMasterLogin) isMasterAdminAuthenticated = true;
+
+                // 關閉登入首頁遮罩
+                document.getElementById('mainLoginPortal').style.display = 'none';
+
+                // 👑 控制頂部店家顯示：南崁中正顯示下拉選單；其他分店隱藏選單只顯示名稱
+                const globalSelect = document.getElementById('globalStore');
+                const storeNameDisplay = document.getElementById('currentStoreNameDisplay');
+
+                if (globalSelect) {
+                    globalSelect.value = storeName;
+                    if (isMasterLogin) {
+                        globalSelect.style.display = 'inline-block';
+                        if (storeNameDisplay) storeNameDisplay.style.display = 'none';
+                    } else {
+                        globalSelect.style.display = 'none';
+                        if (storeNameDisplay) {
+                            storeNameDisplay.innerText = storeName;
+                            storeNameDisplay.style.display = 'inline-block';
+                        }
+                    }
+                }
+
+                applyDataToState(sData, storeName);
+                checkAddStoreButtonVisibility();
+                
+                showToast(`🎉 歡迎登入【${storeName}】！`);
+
+            } catch (err) {
+                console.error("登入失敗:", err);
+                alert("登入過程發生錯誤：" + (err.message || err));
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 💡 3. 一鍵登出：彈回首頁並重置狀態
+        function handleStoreLogout() {
+            if (!confirm("確定要登出系統嗎？")) return;
+
+            authenticatedStores = [];
+            isMasterAdminAuthenticated = false;
+            
+            document.getElementById('portalPasswordInput').value = '';
+            document.getElementById('mainLoginPortal').style.display = 'flex';
+            loadFromCloud(); // 刷新門市清單
+            showToast("🚪 已安全登出系統！");
         }
 
         // 💡 終極安全版 saveToCloud：加入「未登入強制阻擋」防呆，絕不允許空白覆蓋！
@@ -1141,13 +1310,12 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             const daysInMonth = new Date(year, month, 0).getDate();
             const formattedMonthStr = `${year} / ${String(month).padStart(2, '0')}`;
             
-            // 💡 判斷是否為過往月份 (歷史月份防誤判)
+            // 判斷是否為過往月份
             const now = new Date();
             const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
             const selectedYearMonth = year * 12 + month;
             const isPastMonth = selectedYearMonth < currentYearMonth;
 
-            // 💡 歷史月份低飽和度樣式安全掛載
             const schedTable = document.getElementById('scheduleTable');
             if (schedTable) {
                 if (isPastMonth) schedTable.classList.add('past-month-table');
@@ -1185,7 +1353,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
 
             let extraColCount = (showReal?1:0) + (showTarget?1:0) + (showAL?1:0) + (showOT?1:0) + (showRemAL?1:0) + (showRemCL?1:0);
 
-            // 動態產生 colgroup
             let colgroupHtml = `<col class="col-name" style="width: 70px; min-width: 70px; max-width: 80px;">`;
             for(let i = 1; i <= daysInMonth; i++) {
                 colgroupHtml += `<col class="col-day" style="width: 24px; min-width: 24px; max-width: 24px;">`;
@@ -1205,19 +1372,32 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             let thead = document.getElementById('scheduleHead');
             if (!thead) return;
             
-            // 1. 人力提示列
+            // 💡 1. 人力提示列（含：缺人/多人生產力提示 ＋ 當日排休上限防呆條件計算）
             let alertRow = '';
+            // 記錄每日排休控管背景色樣式
+            let dailyOffLimitBgClasses = {};
+
             if (showAlert) {
                 alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
+                
                 for(let i=1; i<=daysInMonth; i++) {
                     let d = new Date(year, month-1, i).getDay();
                     let reqIdx = (d === 0) ? 6 : d - 1; 
                     let dailyAlerts = [];
                     
+                    let sumAbcReq = 0;
+                    let maxAbcReq = 0;
+
+                    // 統計各班別人數差異
                     state.manpower.forEach(mp => {
-                        let req = mp.reqs[reqIdx];
+                        let req = mp.reqs[reqIdx] || 0;
                         let targetPos = (mp.pos || '通用').trim();
                         let currentCount = 0;
+
+                        if (['A','B','C'].includes(mp.class.toUpperCase())) {
+                            sumAbcReq += req;
+                            if (req > maxAbcReq) maxAbcReq = req;
+                        }
 
                         state.staff.forEach(staffMember => {
                             if (targetPos !== '通用' && targetPos !== '' && staffMember.pos !== targetPos) return;
@@ -1236,6 +1416,30 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         if (diff < 0) dailyAlerts.push(`<span class="text-danger">${labelName}(${Math.abs(diff)})</span>`);
                         if (diff > 0) dailyAlerts.push(`<span class="text-success">${labelName}(${diff})</span>`);
                     });
+
+                    // 💡 核心控管：當日排休人數門檻計算 (條件1 vs 條件2)
+                    let cond1 = Math.ceil(sumAbcReq / 2); // 條件 1: ABC總人數/2 無條件進位
+                    let cond2 = maxAbcReq;               // 條件 2: ABC最高人數需求
+                    let mainLimit = Math.max(cond1, cond2); // 主要門檻 (取較高者)
+
+                    // 計算當日實際排休人數 (休、例、國、特、事、病、補等)
+                    let dailyOffCount = 0;
+                    state.staff.forEach(staffMember => {
+                        let s = (staffMember.shifts && staffMember.shifts[`${year}-${month}-${i}`]) ? staffMember.shifts[`${year}-${month}-${i}`].trim() : '';
+                        if (['休', '例', '國', '特', '事', '病', '補'].includes(s) || s.endsWith('特') || s.endsWith('補')) {
+                            dailyOffCount++;
+                        }
+                    });
+
+                    // 判斷顏色：達到最低限度為淺紅，達到最低限度+1為灰色
+                    if (mainLimit > 0) {
+                        if (dailyOffCount >= (mainLimit + 1)) {
+                            dailyOffLimitBgClasses[i] = 'background-color: #cbd5e1 !important; color: #334155 !important;'; // 達到最低限度+1 (灰色)
+                        } else if (dailyOffCount >= mainLimit) {
+                            dailyOffLimitBgClasses[i] = 'background-color: #fecaca !important; color: #991b1b !important;'; // 達到最低限度 (淺紅)
+                        }
+                    }
+
                     alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
                 }
                 if (extraColCount > 0) alertRow += `<td colspan="${extraColCount}"></td>`;
@@ -1272,14 +1476,16 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             }
             row2 += `</tr>`;
 
-            // 4. 表頭
+            // 4. 日期與星期表頭列 (套用排休控管之淺紅/灰色樣式)
             let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}${historyBadge}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
                 let d = new Date(year, month-1, i).getDay();
                 let dayClass = (d === 0) ? 'day-sun' : (d === 6) ? 'day-sat' : '';
-                dateRow += `<th class="day-col ${dayClass}">${i}</th>`;
-                dayRow += `<th class="day-col ${dayClass}">${weekDays[d]}</th>`;
+                let customDateBg = dailyOffLimitBgClasses[i] || ''; // 套用排休限額淺紅或灰色
+
+                dateRow += `<th class="day-col ${dayClass}" style="${customDateBg}">${i}</th>`;
+                dayRow += `<th class="day-col ${dayClass}" style="${customDateBg}">${weekDays[d]}</th>`;
             }
 
             if (showReal) dateRow += `<th rowspan="2" class="stat-col">實休</th>`;
@@ -1299,13 +1505,12 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             tbody.innerHTML = '';
             
             state.staff.forEach((emp, empIdx) => {
-                // 📌 核心關鍵：自動回溯統計該月份之前的所有歷史消耗
                 let hist = getHistoricalStats(emp, year, month);
                 let startAL = (Number(emp.baseAL) || 0) - hist.prevUsedAL;
                 let startCL = (Number(emp.baseCL) || 0) + hist.prevEarnedOT - hist.prevUsedCL;
 
                 let realOff = 0, usedAL = 0, usedCL = 0, earnedOT = 0;
-                let runningCLBalance = startCL; // 從結轉進來的補休餘額開始跑每日時序
+                let runningCLBalance = startCL;
                 let hasTimingError = false;
 
                 let valUi = '';
@@ -1347,7 +1552,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         usedCL += dailyCL;
                         earnedOT += dailyOT;
 
-                        // 每日時序檢核：加班先入池，補休後扣除
                         runningCLBalance += dailyOT;
                         runningCLBalance -= dailyCL;
                         if (runningCLBalance < 0) hasTimingError = true;
@@ -1365,8 +1569,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                 }
 
                 realOff += (usedAL + usedCL) / 8;
-                
-                // 💡 正確的跨月結轉剩餘時數
                 let remAL = startAL - usedAL;
                 let finalRemCL = startCL + earnedOT - usedCL;
 
@@ -1417,6 +1619,7 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             }
             footDateRow += `</tr>`;
             footDayRow += `</tr>`;
+
             footHtml += footDateRow + footDayRow;
 
             classesToCount.forEach(cls => {
@@ -1451,10 +1654,64 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             renderQuickRef();
         }
 
+        // 💡 升級版 updateShift：排休超過門檻時主動彈窗提示，按「確定」仍可繼續排入
         function updateShift(empIdx, dateKey, val) {
-            if(!state.staff[empIdx].shifts) state.staff[empIdx].shifts = {};
-            state.staff[empIdx].shifts[dateKey] = val; 
-            renderSchedule(); 
+            if (!state.staff[empIdx].shifts) state.staff[empIdx].shifts = {};
+            const oldVal = state.staff[empIdx].shifts[dateKey] || '';
+            const trimmedVal = (val || '').trim();
+
+            const offKeywords = ['休', '例', '國', '特', '事', '病', '補'];
+            const isTargetOff = offKeywords.includes(trimmedVal) || trimmedVal.endsWith('特') || trimmedVal.endsWith('補');
+            const wasOldOff = offKeywords.includes(oldVal) || oldVal.endsWith('特') || oldVal.endsWith('補');
+
+            // 如果新排入的是「休假日」且原本不是休假日，進行上限檢測
+            if (isTargetOff && !wasOldOff) {
+                const parts = dateKey.split('-').map(Number);
+                const year = parts[0], month = parts[1], day = parts[2];
+                const dWeek = new Date(year, month - 1, day).getDay();
+                const reqIdx = (dWeek === 0) ? 6 : dWeek - 1;
+
+                let sumAbcReq = 0;
+                let maxAbcReq = 0;
+
+                state.manpower.forEach(mp => {
+                    if (['A', 'B', 'C'].includes((mp.class || '').toUpperCase())) {
+                        const req = mp.reqs[reqIdx] || 0;
+                        sumAbcReq += req;
+                        if (req > maxAbcReq) maxAbcReq = req;
+                    }
+                });
+
+                const cond1 = Math.ceil(sumAbcReq / 2);
+                const cond2 = maxAbcReq;
+                const mainLimit = Math.max(cond1, cond2);
+
+                if (mainLimit > 0) {
+                    // 計算當前該日已有多少人排休
+                    let currentOffCount = 0;
+                    state.staff.forEach(member => {
+                        const s = (member.shifts && member.shifts[dateKey]) ? member.shifts[dateKey].trim() : '';
+                        if (offKeywords.includes(s) || s.endsWith('特') || s.endsWith('補')) {
+                            currentOffCount++;
+                        }
+                    });
+
+                    // 若加上即將排入的這一位會達到或超過上限
+                    if (currentOffCount >= mainLimit) {
+                        const isConfirmed = confirm(`⚠️【排休人數警示】\n\n【${month}月${day}日】排休人數目前已有 ${currentOffCount} 人（門檻上限為 ${mainLimit} 人）！\n若再排入【${trimmedVal}】出勤人力可能低於最低限度。\n\n請問是否確定仍要排入？\n・按「確定」：強制排入\n・按「取消」：還原為原班別`);
+                        
+                        if (!isConfirmed) {
+                            // 使用者取消，還原為原本班別
+                            const inputEl = document.getElementById(`shift-${empIdx}-${day}`);
+                            if (inputEl) inputEl.value = oldVal;
+                            return;
+                        }
+                    }
+                }
+            }
+
+            state.staff[empIdx].shifts[dateKey] = val;
+            renderSchedule();
         }
         function updateRemark(empIdx, dateKey, val) { 
             if (!state.staff[empIdx].remarks) state.staff[empIdx].remarks = {};

@@ -239,10 +239,28 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        #toast { visibility: hidden; min-width: 180px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 8px; position: fixed; z-index: 10000; left: 50%; bottom: 25px; transform: translateX(-50%); font-size: 13px; }
-        #toast.show { visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.2s; }
-        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 25px; opacity: 1;} }
-        @keyframes fadeout { from {bottom: 25px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        /* 💡 升級版：超明顯大尺寸提示框 */
+        #toast { 
+            visibility: hidden; 
+            min-width: 320px; 
+            background-color: #217346; /* 醒目質感綠 */
+            color: #fff; 
+            text-align: center; 
+            border-radius: 8px; 
+            padding: 18px 24px; 
+            position: fixed; 
+            z-index: 10000; 
+            left: 50%; 
+            bottom: 40px; 
+            transform: translateX(-50%); 
+            font-size: 18px; /* 字體大幅放大 */
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            letter-spacing: 1px;
+        }
+        #toast.show { visibility: visible; animation: fadein 0.4s, fadeout 0.4s 2.0s forwards; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 40px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 40px; opacity: 1;} to {bottom: 0; opacity: 0;} }
 
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
@@ -811,7 +829,7 @@ button:disabled, input:disabled, select:disabled {
         function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
         function showToast(text) {
             const toast = document.getElementById("toast"); toast.innerText = text;
-            toast.className = "show"; setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 1500);
+            toast.className = "show"; setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
         }
         function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => { showToast(`已複製： ${text}`); }); }
         function toggleColumns() { renderSchedule(); }
@@ -1116,11 +1134,52 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             showToast("🚪 已安全登出系統！");
         }
 
+        // 💡 補回遺失的函式：確保輸入框即時同步，防止儲存時畫面無反應卡死
+        function syncStaffInputs() {
+            if (!state.staff || !Array.isArray(state.staff)) return;
+            state.staff.forEach((emp, idx) => {
+                const chk = document.getElementById(`mgr-chk-${idx}`);
+                const idInput = document.getElementById(`staff-id-${idx}`);
+                const nameInput = document.getElementById(`staff-name-${idx}`);
+                const posInput = document.getElementById(`staff-pos-${idx}`);
+                const groupInput = document.getElementById(`staff-group-${idx}`);
+                const alInput = document.getElementById(`staff-al-${idx}`);
+                const clInput = document.getElementById(`staff-cl-${idx}`);
+                const otInput = document.getElementById(`staff-ot-${idx}`);
+
+                if (chk) emp.isManager = chk.checked;
+                if (idInput) emp.id = idInput.value.trim();
+                if (nameInput) emp.name = nameInput.value.trim();
+                if (posInput) emp.pos = posInput.value.trim();
+                if (groupInput) emp.group = groupInput.value.trim();
+                if (alInput) emp.baseAL = Number(alInput.value) || 0;
+                if (clInput) emp.baseCL = Number(clInput.value) || 0;
+                if (otInput) emp.baseOT = Number(otInput.value) || 0;
+                
+                if (!emp.uid) {
+                    emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
+                }
+            });
+        }
+
         // 💡 徹底解決刪除復原問題：使用完全覆蓋寫入 (移除 merge: true)，確保刪除的班表徹底抹除
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             
-            // 1. 同步最新輸入框資料
+            // 🔒 雙重防呆：確保該門市有登入權限才能寫入
+            const hasPermission = authenticatedStores.includes(activeStore) || isMasterAdminAuthenticated;
+            if (!hasPermission) {
+                return alert(`🛑【操作阻擋】\n您目前尚未登入【${activeStore}】，無法儲存資料！`);
+            }
+
+            // 💡 1. 儲存前二次確認防呆
+            const isConfirmed = confirm(`是否儲存寫入資料庫？\n\n將把目前的班表與所有設定覆蓋至【${activeStore}】的雲端系統。`);
+            if (!isConfirmed) {
+                showToast("已取消儲存操作");
+                return;
+            }
+
+            // 2. 同步最新輸入框資料
             syncStaffInputs();
 
             showLoading(`正在將【${activeStore}】寫入 Firebase 資料庫...`);
@@ -1147,10 +1206,13 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             };
 
             try {
-                // 📌 核心關鍵：完全覆蓋寫入 (不帶 merge)，資料庫會如實刪除已被清空的日期班表！
+                // 📌 完全覆蓋寫入 (不帶 merge)
                 await db.collection("stores").doc(activeStore).set(payload);
                 hideLoading();
+                
+                // 💡 3. 完成後只保留下方放大版的提示框 (移除 alert 避免干擾)
                 showToast(`🎉【${activeStore}】已成功同步寫入資料庫！`);
+
             } catch (err) {
                 hideLoading();
                 console.error("Firebase 儲存失敗:", err);

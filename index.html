@@ -1116,55 +1116,19 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             showToast("🚪 已安全登出系統！");
         }
 
-        // 💡 終極安全版 saveToCloud：加入「未登入強制阻擋」防呆，絕不允許空白覆蓋！
+        // 💡 徹底解決刪除復原問題：使用完全覆蓋寫入 (移除 merge: true)，確保刪除的班表徹底抹除
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             
-            // 🔒 核心防呆：未通過該門市驗證登入，絕對禁止執行儲存！
-            const hasPermission = authenticatedStores.includes(activeStore) || isMasterAdminAuthenticated;
-            if (!hasPermission) {
-                alert(`🛑【系統強制阻擋儲存】\n\n您目前尚未登入【${activeStore}】！\n為避免未載入的空白資料覆蓋雲端，請先點擊上方【🔐 登入】按鈕完成密碼驗證。`);
-                return;
-            }
+            // 1. 同步最新輸入框資料
+            syncStaffInputs();
 
-            // 🔒 第二道防線：防範空資料覆蓋（如果員工與班別皆為空，要求二次確認）
-            if ((!state.staff || state.staff.length === 0) && (!state.shiftMap || state.shiftMap.length === 0)) {
-                const confirmEmptySave = confirm(`⚠️【空白資料警示】\n\n目前【${activeStore}】的人員與班別設定皆為空白！\n確定要將這份「完全空白」的狀態儲存覆蓋至雲端嗎？`);
-                if (!confirmEmptySave) {
-                    showToast("已取消儲存");
-                    return;
-                }
-            }
-
-            const dateVal = document.getElementById('schedule-month').value;
-            
-            // 💡 歷史月份儲存防呆警示
-            if (dateVal) {
-                const [year, month] = dateVal.split('-').map(Number);
-                const now = new Date();
-                const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
-                const selectedYearMonth = year * 12 + month;
-
-                if (selectedYearMonth < currentYearMonth) {
-                    const confirmPastSave = confirm(`⚠️【歷史月份儲存警告】\n\n您目前正在儲存【${year}年${month}月】（過往歷史月份）的班表！\n修改過往班表可能會導致時數時間序紀錄產生變動。\n\n確定仍要覆蓋儲存此歷史班表嗎？`);
-                    if (!confirmPastSave) {
-                        showToast("已取消儲存");
-                        return;
-                    }
-                }
-            }
-
-            showLoading(`正在將【${activeStore}】安全寫入 Firebase...`);
+            showLoading(`正在將【${activeStore}】寫入 Firebase 資料庫...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
-
-            // 整理班表資料與 UID
             state.staff.forEach((emp, idx) => {
-                if (!emp.uid) {
-                    emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
-                }
-
+                if (!emp.uid) emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
                 scheduleShifts[emp.uid] = emp.shifts || {};
                 scheduleRemarks[emp.uid] = emp.remarks || {};
             });
@@ -1183,15 +1147,14 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             };
 
             try {
-                await db.collection("stores").doc(activeStore).set(payload, { merge: true });
-                renderStaff();
-                renderSchedule();
-                showToast(`🎉【${activeStore}】班表與人員資料已安全同步儲存！`);
-            } catch (err) {
-                console.error("Firebase 儲存失敗:", err);
-                alert("儲存至 Firebase 失敗：" + err.message);
-            } finally {
+                // 📌 核心關鍵：完全覆蓋寫入 (不帶 merge)，資料庫會如實刪除已被清空的日期班表！
+                await db.collection("stores").doc(activeStore).set(payload);
                 hideLoading();
+                showToast(`🎉【${activeStore}】已成功同步寫入資料庫！`);
+            } catch (err) {
+                hideLoading();
+                console.error("Firebase 儲存失敗:", err);
+                alert("❌ 儲存失敗：" + (err.message || err));
             }
         }
 
@@ -1310,7 +1273,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             const daysInMonth = new Date(year, month, 0).getDate();
             const formattedMonthStr = `${year} / ${String(month).padStart(2, '0')}`;
             
-            // 判斷是否為過往月份
             const now = new Date();
             const currentYearMonth = now.getFullYear() * 12 + (now.getMonth() + 1);
             const selectedYearMonth = year * 12 + month;
@@ -1372,32 +1334,60 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             let thead = document.getElementById('scheduleHead');
             if (!thead) return;
             
-            // 💡 1. 人力提示列（含：缺人/多人生產力提示 ＋ 當日排休上限防呆條件計算）
-            let alertRow = '';
-            // 記錄每日排休控管背景色樣式
+            // 💡 1. 每日排休控管色階計算 (以非排休出勤標準反推可排休上限)
             let dailyOffLimitBgClasses = {};
+            let alertRow = '';
+            let totalStaffCount = state.staff.length;
+
+            for(let i=1; i<=daysInMonth; i++) {
+                let d = new Date(year, month-1, i).getDay();
+                let reqIdx = (d === 0) ? 6 : d - 1; 
+
+                let sumAbcReq = 0;
+                let maxAbcReq = 0;
+
+                state.manpower.forEach(mp => {
+                    if (['A', 'B', 'C'].includes((mp.class || '').toUpperCase())) {
+                        let req = Number(mp.reqs[reqIdx]) || 0;
+                        sumAbcReq += req;
+                        if (req > maxAbcReq) maxAbcReq = req;
+                    }
+                });
+
+                let cond1 = Math.ceil(sumAbcReq / 2);
+                let cond2 = maxAbcReq;
+                let minWorkReq = Math.max(cond1, cond2); // 最低出勤人數
+                let maxOffLimit = Math.max(0, totalStaffCount - minWorkReq); // 最大可排休人數
+
+                let dailyOffCount = 0;
+                state.staff.forEach(member => {
+                    let s = (member.shifts && member.shifts[`${year}-${month}-${i}`]) ? member.shifts[`${year}-${month}-${i}`].trim() : '';
+                    if (['休', '例', '國', '特', '事', '病', '補'].includes(s) || s.endsWith('特') || s.endsWith('補')) {
+                        dailyOffCount++;
+                    }
+                });
+
+                // 倒數名額警戒判定
+                if (maxOffLimit > 0) {
+                    if (dailyOffCount >= maxOffLimit) {
+                        dailyOffLimitBgClasses[i] = 'background-color: #fecaca !important; color: #991b1b !important; font-weight: bold;'; // 🚨 已達排休上限（淺紅）
+                    } else if (dailyOffCount === (maxOffLimit - 1)) {
+                        dailyOffLimitBgClasses[i] = 'background-color: #cbd5e1 !important; color: #334155 !important; font-weight: bold;'; // ⚠️ 只剩 1 個排休名額（灰底）
+                    }
+                }
+            }
 
             if (showAlert) {
                 alertRow = `<tr class="alert-row" style="background-color: #f8f9fa;"><td class="name-col"><strong>人力提示</strong></td>`;
-                
                 for(let i=1; i<=daysInMonth; i++) {
                     let d = new Date(year, month-1, i).getDay();
                     let reqIdx = (d === 0) ? 6 : d - 1; 
                     let dailyAlerts = [];
-                    
-                    let sumAbcReq = 0;
-                    let maxAbcReq = 0;
 
-                    // 統計各班別人數差異
                     state.manpower.forEach(mp => {
                         let req = mp.reqs[reqIdx] || 0;
                         let targetPos = (mp.pos || '通用').trim();
                         let currentCount = 0;
-
-                        if (['A','B','C'].includes(mp.class.toUpperCase())) {
-                            sumAbcReq += req;
-                            if (req > maxAbcReq) maxAbcReq = req;
-                        }
 
                         state.staff.forEach(staffMember => {
                             if (targetPos !== '通用' && targetPos !== '' && staffMember.pos !== targetPos) return;
@@ -1416,29 +1406,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         if (diff < 0) dailyAlerts.push(`<span class="text-danger">${labelName}(${Math.abs(diff)})</span>`);
                         if (diff > 0) dailyAlerts.push(`<span class="text-success">${labelName}(${diff})</span>`);
                     });
-
-                    // 💡 核心控管：當日排休人數門檻計算 (條件1 vs 條件2)
-                    let cond1 = Math.ceil(sumAbcReq / 2); // 條件 1: ABC總人數/2 無條件進位
-                    let cond2 = maxAbcReq;               // 條件 2: ABC最高人數需求
-                    let mainLimit = Math.max(cond1, cond2); // 主要門檻 (取較高者)
-
-                    // 計算當日實際排休人數 (休、例、國、特、事、病、補等)
-                    let dailyOffCount = 0;
-                    state.staff.forEach(staffMember => {
-                        let s = (staffMember.shifts && staffMember.shifts[`${year}-${month}-${i}`]) ? staffMember.shifts[`${year}-${month}-${i}`].trim() : '';
-                        if (['休', '例', '國', '特', '事', '病', '補'].includes(s) || s.endsWith('特') || s.endsWith('補')) {
-                            dailyOffCount++;
-                        }
-                    });
-
-                    // 判斷顏色：達到最低限度為淺紅，達到最低限度+1為灰色
-                    if (mainLimit > 0) {
-                        if (dailyOffCount >= (mainLimit + 1)) {
-                            dailyOffLimitBgClasses[i] = 'background-color: #cbd5e1 !important; color: #334155 !important;'; // 達到最低限度+1 (灰色)
-                        } else if (dailyOffCount >= mainLimit) {
-                            dailyOffLimitBgClasses[i] = 'background-color: #fecaca !important; color: #991b1b !important;'; // 達到最低限度 (淺紅)
-                        }
-                    }
 
                     alertRow += `<td class="day-col" style="font-size:10px; line-height:1.1; padding:1px 0; white-space:normal;">${dailyAlerts.length > 0 ? dailyAlerts.join('<br>') : '<span style="color:#ccc">-</span>'}</td>`;
                 }
@@ -1476,13 +1443,13 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             }
             row2 += `</tr>`;
 
-            // 4. 日期與星期表頭列 (套用排休控管之淺紅/灰色樣式)
+            // 4. 表頭 (套用排休先灰再紅樣式)
             let dateRow = `<tr class="header-date-row"><th rowspan="2" class="name-col" style="font-size:13px; font-weight:bold; color:#000; line-height:1.2; padding:4px 2px;">${storeTitleDisplay}${formattedMonthStr}${historyBadge}</th>`;
             let dayRow = `<tr class="header-week-row">`;
             for(let i=1; i<=daysInMonth; i++) {
                 let d = new Date(year, month-1, i).getDay();
                 let dayClass = (d === 0) ? 'day-sun' : (d === 6) ? 'day-sat' : '';
-                let customDateBg = dailyOffLimitBgClasses[i] || ''; // 套用排休限額淺紅或灰色
+                let customDateBg = dailyOffLimitBgClasses[i] || ''; 
 
                 dateRow += `<th class="day-col ${dayClass}" style="${customDateBg}">${i}</th>`;
                 dayRow += `<th class="day-col ${dayClass}" style="${customDateBg}">${weekDays[d]}</th>`;
@@ -1654,7 +1621,7 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             renderQuickRef();
         }
 
-        // 💡 升級版 updateShift：排休超過門檻時主動彈窗提示，按「確定」仍可繼續排入
+        // 💡 升級版 updateShift：排休達上限時主動彈窗提示，按「確定」仍可繼續排入
         function updateShift(empIdx, dateKey, val) {
             if (!state.staff[empIdx].shifts) state.staff[empIdx].shifts = {};
             const oldVal = state.staff[empIdx].shifts[dateKey] || '';
@@ -1676,18 +1643,19 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
 
                 state.manpower.forEach(mp => {
                     if (['A', 'B', 'C'].includes((mp.class || '').toUpperCase())) {
-                        const req = mp.reqs[reqIdx] || 0;
+                        const req = Number(mp.reqs[reqIdx]) || 0;
                         sumAbcReq += req;
                         if (req > maxAbcReq) maxAbcReq = req;
                     }
                 });
 
+                const totalStaffCount = state.staff.length;
                 const cond1 = Math.ceil(sumAbcReq / 2);
                 const cond2 = maxAbcReq;
-                const mainLimit = Math.max(cond1, cond2);
+                const minWorkReq = Math.max(cond1, cond2);
+                const maxOffLimit = Math.max(0, totalStaffCount - minWorkReq);
 
-                if (mainLimit > 0) {
-                    // 計算當前該日已有多少人排休
+                if (maxOffLimit > 0) {
                     let currentOffCount = 0;
                     state.staff.forEach(member => {
                         const s = (member.shifts && member.shifts[dateKey]) ? member.shifts[dateKey].trim() : '';
@@ -1696,12 +1664,11 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         }
                     });
 
-                    // 若加上即將排入的這一位會達到或超過上限
-                    if (currentOffCount >= mainLimit) {
-                        const isConfirmed = confirm(`⚠️【排休人數警示】\n\n【${month}月${day}日】排休人數目前已有 ${currentOffCount} 人（門檻上限為 ${mainLimit} 人）！\n若再排入【${trimmedVal}】出勤人力可能低於最低限度。\n\n請問是否確定仍要排入？\n・按「確定」：強制排入\n・按「取消」：還原為原班別`);
+                    // 若即將排入的假別會導致排休人數達到或超過上限
+                    if (currentOffCount >= maxOffLimit) {
+                        const isConfirmed = confirm(`⚠️【排休人數警示】\n\n【${month}月${day}日】排休人數目前已有 ${currentOffCount} 人（上限為 ${maxOffLimit} 人）！\n若再排入【${trimmedVal}】將導致出勤人數低於最低需求（${minWorkReq} 人）。\n\n請問是否確定仍要排入？\n・按「確定」：強制排入\n・按「取消」：還原為原班別`);
                         
                         if (!isConfirmed) {
-                            // 使用者取消，還原為原本班別
                             const inputEl = document.getElementById(`shift-${empIdx}-${day}`);
                             if (inputEl) inputEl.value = oldVal;
                             return;
@@ -3406,12 +3373,15 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             if (prop === 'size') element.style.fontSize = val;
             showToast(`🎨 備註已套用：${prop === 'color' ? '自訂顏色' : '字級 ' + val}`);
         }
-        // 💡 重新整理當前門市資料 (不登出、直接重新自 Firebase 載入最新班表)
+        // 💡 修正版：重新整理當前門市資料（支援南崁中正總管理者免驗證放行）
         async function reloadCurrentStoreData() {
             const storeSelect = document.getElementById('globalStore');
             const currentStore = storeSelect ? storeSelect.value : "南崁中正";
 
-            if (!authenticatedStores.includes(currentStore)) {
+            // 👑 檢查權限：若為南崁中正總管理者，或該門市已被驗證過，皆直接放行
+            const hasAccess = isMasterAdminAuthenticated || authenticatedStores.includes(currentStore);
+
+            if (!hasAccess) {
                 showToast("⚠️ 目前門市尚未登入，請先完成驗證");
                 return;
             }

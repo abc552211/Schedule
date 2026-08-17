@@ -2207,7 +2207,7 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             validateDeformRules();
         }
 
-        // 💡 升級版：支援「D班/各班別平均放置」與「By 職位精準人力控管」
+        // 💡 升級版 autoOptimizeSchedule：執行前檢查全體員工 [例.休.國] 是否達標，未達標彈窗列出名單防呆
         function autoOptimizeSchedule() {
             const dateVal = document.getElementById('schedule-month').value; 
             if (!dateVal) return alert("請先選擇排班年月！");
@@ -2231,11 +2231,64 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
             if (!state.staff || state.staff.length === 0) return alert("請先在人員設定中新增員工！");
             if (!state.manpower || state.manpower.length === 0) return alert("請先在人數控管中設定每日人力需求！");
 
+            // 💡 計算當月目標應有帳休總天數 (例 + 休 + 國)
+            let targetLei = 0, targetXiu = 0, targetGuo = 0;
+            ints.forEach(int => {
+                targetLei += (Number(int.reqLei) || 0);
+                targetXiu += (Number(int.reqXiu) || 0);
+                targetGuo += (Number(int.reqGuo) || 0);
+            });
+            const totalOffTarget = targetLei + targetXiu + targetGuo;
+
+            // 🔍 核心防呆檢核：統計每位員工在當月的基本假數是否達到帳休
+            let incompleteStaffList = [];
+
+            state.staff.forEach(emp => {
+                let offDaysCount = 0;
+                let usedALHours = 0;
+                let usedCLHours = 0;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const k1 = `${year}-${month}-${d}`;
+                    const k2 = `${year}-${formattedMM}-${String(d).padStart(2, '0')}`;
+                    const dateKey = (emp.shifts && emp.shifts[k1] !== undefined) ? k1 : k2;
+                    const s = (emp.shifts && emp.shifts[dateKey]) ? emp.shifts[dateKey].trim() : '';
+
+                    if (['例', '休', '國'].includes(s)) {
+                        offDaysCount++;
+                    }
+
+                    // 亦計入特休與補休折算天數 (8小時 = 1天)
+                    const map = state.shiftMap.find(m => m.key === s && m.pos === emp.pos) || state.shiftMap.find(m => m.key === s && (m.pos === '通用' || m.pos === ''));
+                    if (map) {
+                        usedALHours += (Number(map.al) || 0);
+                        usedCLHours += (Number(map.cl) || 0);
+                    }
+                }
+
+                offDaysCount += (usedALHours + usedCLHours) / 8;
+
+                if (offDaysCount < totalOffTarget) {
+                    const diff = totalOffTarget - offDaysCount;
+                    incompleteStaffList.push(`・${emp.name}（目前 ${offDaysCount} 天，尚缺 ${diff} 天）`);
+                }
+            });
+
+            // ⚠️ 若有人員未達帳休標準，彈窗提示並列出名單
+            if (incompleteStaffList.length > 0) {
+                const warnMsg = `⚠️【人員尚未完成排假提示】\n\n本月應休目標為【${totalOffTarget} 天】(例+休+國)，以下人員排假尚未達標：\n\n${incompleteStaffList.join('\n')}\n\n若未完成排假即執行一鍵排班，系統將會為其填補出勤班別。\n\n請問是否仍要略過並強制執行一鍵排班？\n・按「確定」：強制繼續排班\n・按「取消」：返回手動補齊假別`;
+                const isConfirmed = confirm(warnMsg);
+                if (!isConfirmed) {
+                    showToast("已取消自動排班，請先補齊人員排休");
+                    return;
+                }
+            }
+
             showLoading(`正在進行【${cat}】排班最佳化 (平均放置班別)...`);
 
             setTimeout(() => {
                 try {
-                    // 1. 處理核心區間與例休國判定
+                    // 1. 處理核心區間與例休國判定 (將手劃休假依變形工時轉譯)
                     state.staff.forEach(emp => {
                         if (!emp.shifts) emp.shifts = {};
 
@@ -2321,19 +2374,18 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         }
                     });
 
-                    // 2. 準備可用出勤班別
+                    // 2. 準備可用出勤班別 (排除所有休假假別)
                     const availableShifts = state.shiftMap.filter(m => {
                         let k = (m.key || '').trim();
-                        if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k)) return false;
+                        if (!k || ['休', '例', '國', '特', '事', '病', '補'].includes(k) || k.endsWith('特') || k.endsWith('補')) return false;
                         if (m.autoAssign === false) return false;
                         return true;
                     });
 
-                    // 📌 核心機制 1：班別排班次數計數器（用於平均分配 D 班及各班別）
+                    // 班別次數追蹤器 (平均分配出勤班別)
                     let shiftCountTracker = {};
                     state.staff.forEach(emp => {
                         shiftCountTracker[emp.uid || emp.id] = {};
-                        // 統計目前已手動排入的班別次數
                         for (let d = 1; d <= daysInMonth; d++) {
                             let k1 = `${year}-${month}-${d}`;
                             let s = emp.shifts[k1];
@@ -2343,19 +2395,17 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                         }
                     });
 
-                    // 3. 逐日填補出勤人力
+                    // 3. 逐日填補出勤人力需求 (滿足人數控管)
                     for (let day = 1; day <= daysInMonth; day++) {
                         let k1 = `${year}-${month}-${day}`;
                         let dWeek = new Date(year, month - 1, day).getDay();
                         let reqIdx = (dWeek === 0) ? 6 : dWeek - 1;
 
-                        // 依據人數控管需求逐一滿足 (精準比對 mp.pos 適用職位)
                         state.manpower.forEach(mp => {
                             let targetReq = mp.reqs[reqIdx] || 0;
                             let cls = mp.class.toUpperCase();
                             let targetPos = (mp.pos || '通用').trim();
 
-                            // 計算當日該時段（及該職位）已出勤人數
                             let currentCount = 0;
                             state.staff.forEach(emp => {
                                 if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) return;
@@ -2373,12 +2423,10 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
 
                             let needed = targetReq - currentCount;
 
-                            // 找出當天尚未排班且職位完全符合的人員
                             let eligibleStaff = state.staff.filter(emp => {
                                 let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
-                                if (s !== '') return false;
+                                if (s !== '') return false; // 已有班別或已劃休者跳過
 
-                                // 若人數控管指定職位，員工職位必須完全吻合
                                 if (targetPos !== '通用' && targetPos !== '' && emp.pos !== targetPos) return false;
 
                                 return availableShifts.some(m => {
@@ -2389,7 +2437,6 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                                 });
                             });
 
-                            // 依累積次數最少者優先放置
                             while (needed > 0 && eligibleStaff.length > 0) {
                                 eligibleStaff.sort((a, b) => {
                                     let countA = shiftCountTracker[a.uid || a.id][cls] || 0;
@@ -2422,7 +2469,7 @@ if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                             }
                         });
 
-                        // 4. 零空白保底填補（剩餘空白人員，依其職位平均填補可用班別）
+                        // 4. 零空白保底填補
                         state.staff.forEach(emp => {
                             let s = (emp.shifts && emp.shifts[k1]) ? emp.shifts[k1].trim() : '';
                             if (s === '') {

@@ -1910,27 +1910,23 @@
         async function saveToCloud() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
 
-            // 🔒 雙重防呆：確保該門市有登入權限才能寫入
             const hasPermission = authenticatedStores.includes(activeStore) || isMasterAdminAuthenticated;
             if (!hasPermission) {
                 return alert(`🛑【操作阻擋】\n您目前尚未登入【${activeStore}】，無法儲存資料！`);
             }
 
-            // 💡 1. 儲存前二次確認防呆
             const isConfirmed = confirm(`是否儲存寫入資料庫？\n\n將把目前的班表與所有設定覆蓋至【${activeStore}】的雲端系統。`);
             if (!isConfirmed) {
                 showToast("已取消儲存操作");
                 return;
             }
 
-            // 2. 同步最新輸入框資料
             syncStaffInputs();
-
-            showLoading(`正在將【${activeStore}】寫入 Firebase 資料庫...`);
+            showLoading(`正在將【${activeStore}】寫入雲端資料庫...`);
 
             let scheduleShifts = {};
             let scheduleRemarks = {};
-            state.staff.forEach((emp, idx) => {
+            (state.staff || []).forEach((emp, idx) => {
                 if (!emp.uid) emp.uid = (emp.id && String(emp.id).trim() !== "") ? String(emp.id).trim() : `uid_${Date.now()}_${idx}`;
                 scheduleShifts[emp.uid] = emp.shifts || {};
                 scheduleRemarks[emp.uid] = emp.remarks || {};
@@ -1940,29 +1936,44 @@
                 storeKey: activeStore,
                 storePassword: storePasswords[activeStore] || "1234",
                 storeCategory: (state.storeCategories && state.storeCategories[activeStore]) ? state.storeCategories[activeStore] : "門市",
-                staff: state.staff,
-                shiftMap: state.shiftMap,
-                manpower: state.manpower,
-                intervals: state.intervals,
-                dailyNotes: state.dailyNotes,
+                staff: state.staff || [],
+                shiftMap: state.shiftMap || [],
+                manpower: state.manpower || [],
+                intervals: state.intervals || {},
+                dailyNotes: state.dailyNotes || {},
                 schedule: { shifts: scheduleShifts, remarks: scheduleRemarks },
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                updatedAt: new Date().toISOString()
             };
 
             try {
+                // 加入 15 秒超時控制，防止網路卡死
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+
                 const res = await fetch(`${API_BASE_URL}/api/store/${encodeURIComponent(activeStore)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
-                if (!res.ok) throw new Error("後端寫入失敗");
 
-                hideLoading();
+                clearTimeout(timeoutId);
+
+                if (!res.ok) {
+                    const errRes = await res.json().catch(() => ({}));
+                    throw new Error(errRes.error || `伺服器回應錯誤 (${res.status})`);
+                }
+
                 showToast(`🎉【${activeStore}】已成功同步寫入資料庫！`);
             } catch (err) {
-                hideLoading();
-                console.error("儲存失敗:", err);
-                alert("❌ 儲存失敗：" + (err.message || err));
+                console.error("儲存失敗詳細原因:", err);
+                if (err.name === 'AbortError') {
+                    alert("❌ 儲存逾時：伺服器連線超時，請檢查網路後再試！");
+                } else {
+                    alert("❌ 儲存失敗：" + (err.message || err));
+                }
+            } finally {
+                hideLoading(); // 無論成功失敗，保證 100% 關閉遮罩
             }
         }
 

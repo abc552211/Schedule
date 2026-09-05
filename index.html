@@ -9,8 +9,8 @@
     <!-- 載入 html2canvas 套件 (用於一鍵班表截圖) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- 💡 新增：載入 SheetJS 套件 (用於產生飛騰系統認可的真實 Excel 檔案) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 💡 載入支援彩色樣式之 xlsx-js-style 套件 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
 
 
     
@@ -783,6 +783,38 @@
         tr.drag-over {
             border-top: 2.5px solid #2196f3 !important;
         }
+        /* 💡 讀取中呼吸動畫與選單彈窗樣式 */
+        @keyframes pulseText {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+        .loading-pulse {
+            animation: pulseText 1.2s infinite ease-in-out;
+            color: #d97706 !important;
+        }
+        .modal-mask {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(3px);
+            z-index: 100001;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            padding: 24px;
+            width: 320px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 
@@ -824,15 +856,17 @@
                 <div
                     style="text-align: left; margin-bottom: 5px; font-size: 12.5px; font-weight: bold; color: #4a5568;">
                     套用店家:</div>
-                <select id="portalStoreSelect" class="portal-field" style="font-weight: bold; color: #3b564a;"></select>
+                <select id="portalStoreSelect" class="portal-field loading-pulse" style="font-weight: bold; color: #3b564a;" disabled>
+                    <option value="">[驗證讀取中...]</option>
+                </select>
 
                 <div
                     style="text-align: left; margin-bottom: 5px; font-size: 12.5px; font-weight: bold; color: #4a5568;">
                     門市密碼:</div>
-                <input type="password" id="portalPasswordInput" class="portal-field" placeholder="請輸入門市密碼"
-                    autocomplete="current-password" onkeydown="if(event.key==='Enter') executePortalLogin()">
+                <input type="password" id="portalPasswordInput" class="portal-field" placeholder="讀取中，請稍候..."
+                    autocomplete="current-password" disabled onkeydown="if(event.key==='Enter') executePortalLogin()">
 
-                <button type="button" class="btn-portal-submit" onclick="executePortalLogin()">進入系統</button>
+                <button type="button" id="btnPortalSubmit" class="btn-portal-submit" disabled onclick="executePortalLogin()">進入系統</button>
             </div>
         </div>
     </div>
@@ -1322,6 +1356,19 @@
     </div>
 
     <div id="toast">訊息提示</div>
+
+    <!-- 💡 下載格式選擇彈窗 -->
+    <div id="downloadFormatModal" class="modal-mask">
+        <div class="modal-box">
+            <h3 style="margin: 0 0 12px; font-size: 16px; color: #1f2937;">📥 選擇下載班表格式</h3>
+            <p style="font-size: 12px; color: #6b7280; margin: 0 0 20px;">請選擇欲匯出的班表檔案格式：</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-line" style="width: 100%; padding: 10px; font-size: 13px; margin: 0;" onclick="chooseDownloadType('image')">圖檔 (JPG)</button>
+                <button type="button" class="btn btn-success" style="width: 100%; padding: 10px; font-size: 13px; margin: 0;" onclick="chooseDownloadType('excel')">班表 (Excel)</button>
+                <button type="button" class="btn" style="width: 100%; padding: 8px; font-size: 12px; margin: 0; background: #e5e7eb; color: #374151;" onclick="closeDownloadFormatModal()">取消</button>
+            </div>
+        </div>
+    </div>
     <!-- 💡 蜂巢調色盤彈出視窗容器 -->
     <div id="honeycombPicker" class="honeycomb-picker-popup">
         <div style="font-size: 11px; font-weight: bold; color: #444; margin-bottom: 6px; text-align: left;">🎨 選擇顏色
@@ -1634,12 +1681,33 @@
             }
         }
 
-        async function captureAndCopyForLine() {
-            // 範例：在 saveToCloud、syncToGoogleSheetAndSupabase、exportFeiTengExcel、captureAndCopyForLine 開頭：
+        // 💡 觸發下載班表：開啟格式選擇彈窗
+        function captureAndCopyForLine() {
             const activeStore = document.getElementById('globalStore').value || "南崁中正";
             if (!isMasterAdminAuthenticated && !authenticatedStores.includes(activeStore)) {
                 return alert(`🛑【操作已鎖定】\n\n您目前尚未登入【${activeStore}】！\n請先點擊【🔐 登入】按鈕完成密碼驗證。`);
             }
+            const modal = document.getElementById('downloadFormatModal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function closeDownloadFormatModal() {
+            const modal = document.getElementById('downloadFormatModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        // 💡 依據使用者選擇執行圖檔或彩色 Excel 匯出
+        function chooseDownloadType(type) {
+            closeDownloadFormatModal();
+            if (type === 'image') {
+                executeImageDownload();
+            } else if (type === 'excel') {
+                exportStyledScheduleExcel();
+            }
+        }
+
+        // 💡 原圖檔下載邏輯 (包含是否隱藏人力提示詢問)
+        async function executeImageDownload() {
             const hideAlert = confirm("截圖是否要【隱藏】上方的【人力提示】？\n\n・按「確定」：隱藏人力提示\n・按「取消」：顯示人力提示");
 
             showLoading("正在生成高畫質班表截圖...");
@@ -1651,19 +1719,16 @@
             const storeName = document.getElementById('globalStore').value || "";
             const fileNameStr = `${year}${month}${storeName}`;
 
-            // 1. 隱藏不必要的圖示與依選擇隱藏人力提示 (含清除表頭紅灰排休警示色)
             document.querySelectorAll('.val-icon').forEach(el => el.style.display = 'none');
             const alertRow = document.querySelector('.alert-row');
             const origAlertDisplay = alertRow ? alertRow.style.display : '';
             if (hideAlert && alertRow) alertRow.style.display = 'none';
 
-            // 💡 暫存表頭 th 原本的 style 樣式
             const headerThs = tableElement.querySelectorAll('.header-date-row th, .header-week-row th');
             const origThStyles = [];
             if (hideAlert) {
                 headerThs.forEach((th, idx) => {
                     origThStyles[idx] = th.getAttribute('style') || '';
-                    // 暫時移除紅灰 style，回歸純淨黃/綠表頭
                     th.style.backgroundColor = '';
                     th.style.color = '';
                     th.style.fontWeight = '';
@@ -1676,7 +1741,6 @@
             const origPadding = tableElement.style.padding;
             tableElement.style.padding = '2px';
 
-            // 2. 暫時將 input / textarea 換成 span 渲染以防字體截斷 (精準繼承畫面上當前所有高度與樣式)
             document.querySelectorAll('.cell-input, .remark-input').forEach(input => {
                 const isRemark = input.classList.contains('remark-input');
                 const span = document.createElement('span');
@@ -1716,7 +1780,6 @@
             });
 
             try {
-                // 3. 生成極致畫質圖片
                 const canvas = await html2canvas(tableElement, {
                     scale: 3,
                     backgroundColor: "#ffffff",
@@ -1724,7 +1787,6 @@
                     logging: false
                 });
 
-                // 4. 截圖完成：立即還原所有樣式
                 if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
                 if (alertRow) alertRow.style.display = origAlertDisplay;
                 if (hideAlert) {
@@ -1755,6 +1817,165 @@
             }
         }
 
+        // 💡 匯出高質感彩色班表 Excel (自動排除人力提示列，精準對位表頭與六日色彩)
+        function exportStyledScheduleExcel() {
+            const tableElement = document.getElementById('scheduleTable');
+            if (!tableElement) return alert("找不到班表表格！");
+
+            const dateVal = document.getElementById('schedule-month').value;
+            const globalStore = document.getElementById('globalStore').value || "門市";
+            const [year, month] = dateVal.split('-').map(Number);
+            const strMonth = String(month).padStart(2, '0');
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            // 1. 深度複製真實網頁表格並移除人力提示與檢核符號
+            const cloneTable = tableElement.cloneNode(true);
+            cloneTable.querySelectorAll('.alert-row').forEach(el => el.remove());
+            cloneTable.querySelectorAll('.val-icon').forEach(el => el.remove());
+
+            // 2. 將輸入框與多行文字轉為純文字
+            cloneTable.querySelectorAll('input.cell-input').forEach(input => {
+                const td = input.closest('td');
+                if (td) td.innerText = (input.value || '').trim();
+            });
+
+            cloneTable.querySelectorAll('textarea.remark-input').forEach(ta => {
+                const td = ta.closest('td');
+                if (td) td.innerText = (ta.value || '').trim();
+            });
+
+            // 3. 建立班別色彩對照表
+            const colorLookup = {};
+            (state.shiftMap || []).forEach(m => {
+                if (m.key) {
+                    const cleanKey = m.key.trim();
+                    let bg = (m.bgColor || '#ffffff').replace('#', '').trim();
+                    let fg = (m.textColor || '#000000').replace('#', '').trim();
+                    if (bg.length === 3) bg = bg.split('').map(c => c + c).join('');
+                    if (fg.length === 3) fg = fg.split('').map(c => c + c).join('');
+                    colorLookup[cleanKey] = { bg: bg.toUpperCase(), fg: fg.toUpperCase() };
+                }
+            });
+
+            // 4. 解析為工作表結構
+            const ws = XLSX.utils.table_to_sheet(cloneTable, { raw: true });
+            const range = XLSX.utils.decode_range(ws['!ref']);
+
+            // 5. 設定欄寬
+            ws['!cols'] = [{ wch: 12 }];
+            for (let c = 1; c <= range.e.c; c++) {
+                ws['!cols'].push({ wch: (c > daysInMonth) ? 5.5 : 4.5 });
+            }
+
+            // 6. 逐格以精確業務規則上色
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cellAddress]) continue;
+
+                    const val = String(ws[cellAddress].v || '').trim();
+
+                    // 基本樣式：微軟正黑體、置中、柔和框線
+                    const cellStyle = {
+                        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                        border: {
+                            top: { style: "thin", color: { rgb: "B0BEC5" } },
+                            bottom: { style: "thin", color: { rgb: "B0BEC5" } },
+                            left: { style: "thin", color: { rgb: "B0BEC5" } },
+                            right: { style: "thin", color: { rgb: "B0BEC5" } }
+                        },
+                        font: { name: "Microsoft JhengHei", sz: 9.5 }
+                    };
+
+                    // R=0: 提醒事項列 (黃底)
+                    if (R === 0) {
+                        cellStyle.fill = { fgColor: { rgb: "FFF3CD" } };
+                        cellStyle.font.color = { rgb: "856404" };
+                        cellStyle.font.bold = true;
+                        if (C === 1) cellStyle.alignment.horizontal = "left";
+                    }
+                    // R=1: 備註列 (極淡灰底)
+                    else if (R === 1) {
+                        cellStyle.fill = { fgColor: { rgb: "F9F9F9" } };
+                        if (C === 0) {
+                            cellStyle.font.bold = true;
+                            cellStyle.font.color = { rgb: "555555" };
+                        }
+                    }
+                    // R=2: 日期列 (整排鵝黃底，週六藍字、週日紅字、其餘深灰字)
+                    else if (R === 2) {
+                        cellStyle.fill = { fgColor: { rgb: "FFF176" } };
+                        cellStyle.font.bold = true;
+                        if (C === 0) {
+                            cellStyle.font.color = { rgb: "0070C0" };
+                            cellStyle.font.sz = 11;
+                        } else if (C >= 1 && C <= daysInMonth) {
+                            const dWeek = new Date(year, month - 1, C).getDay();
+                            if (dWeek === 6) cellStyle.font.color = { rgb: "0D47A1" };      // 週六藍字
+                            else if (dWeek === 0) cellStyle.font.color = { rgb: "B71C1C" }; // 週日紅字
+                            else cellStyle.font.color = { rgb: "333333" };                 // 平日深灰字
+                        } else {
+                            cellStyle.font.color = { rgb: "333333" };
+                        }
+                    }
+                    // R=3: 星期列 (平日淡綠底綠字、週六淡藍底藍字、週日淡粉底紅字)
+                    else if (R === 3) {
+                        cellStyle.font.bold = true;
+                        if (C >= 1 && C <= daysInMonth) {
+                            const dWeek = new Date(year, month - 1, C).getDay();
+                            if (dWeek === 6) {
+                                cellStyle.fill = { fgColor: { rgb: "BBDEFB" } }; // 週六淡藍底
+                                cellStyle.font.color = { rgb: "0D47A1" };       // 藍字
+                            } else if (dWeek === 0) {
+                                cellStyle.fill = { fgColor: { rgb: "FFCDD2" } }; // 週日淡粉紅底
+                                cellStyle.font.color = { rgb: "B71C1C" };       // 紅字
+                            } else {
+                                cellStyle.fill = { fgColor: { rgb: "C8E6C9" } }; // 平日淡綠底
+                                cellStyle.font.color = { rgb: "1B5E20" };       // 深綠字
+                            }
+                        } else {
+                            cellStyle.fill = { fgColor: { rgb: "FFF176" } };
+                            cellStyle.font.color = { rgb: "333333" };
+                        }
+                    }
+                    // R >= 4: 員工班表列
+                    else {
+                        // 姓名欄 (A欄)
+                        if (C === 0) {
+                            cellStyle.font.bold = true;
+                            cellStyle.font.color = { rgb: "0D6EFD" };
+                            cellStyle.fill = { fgColor: { rgb: "FFFFFF" } };
+                        }
+                        // 右側統計欄位
+                        else if (C > daysInMonth) {
+                            cellStyle.fill = { fgColor: { rgb: "FFFFFF" } };
+                            if (C === daysInMonth + 1) cellStyle.font.bold = true; // 實休加粗
+                        }
+                        // 班別儲存格 (按班別速查表填色)
+                        else if (colorLookup[val]) {
+                            cellStyle.fill = { fgColor: { rgb: colorLookup[val].bg } };
+                            cellStyle.font.color = { rgb: colorLookup[val].fg };
+                            cellStyle.font.bold = true;
+                        }
+                        // 空白格：排班列白底，備註列極淡灰底
+                        else {
+                            const isShiftRow = (R % 2 === 0);
+                            cellStyle.fill = { fgColor: { rgb: isShiftRow ? "FFFFFF" : "F9F9F9" } };
+                        }
+                    }
+
+                    ws[cellAddress].s = cellStyle;
+                }
+            }
+
+            // 7. 匯出 Excel
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `${globalStore}_${year}${strMonth}`);
+            const fileName = `${year}${strMonth}_${globalStore}_完整班表.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            showToast(`✅ 已匯出無人力提示的完整彩色班表：${fileName}`);
+        }
+
         // 💡 乾淨單純的 JPG 下載函式 (去除了原本剪貼簿多餘的邏輯)
         function downloadJPG(canvas, fileNameStr) {
             const link = document.createElement('a');
@@ -1782,10 +2003,12 @@
         // 👑 總管理者旗標：南崁中正登入後即為 true，全店家直接免密碼通行 (F5 後自動失效重置)
         let isMasterAdminAuthenticated = false;
 
-        // 💡 1. 雲端同步店家清單 (同時填充頂部與首頁下拉選單)
+        // 💡 1. 雲端同步店家清單 (未完成前鎖定輸入框，完成後解鎖)
         async function loadFromCloud(targetStoreName = null) {
             const storeSelect = document.getElementById('globalStore');
             const portalSelect = document.getElementById('portalStoreSelect');
+            const portalPwd = document.getElementById('portalPasswordInput');
+            const portalBtn = document.getElementById('btnPortalSubmit');
 
             try {
                 const res = await fetch(`${API_BASE_URL}/api/stores`);
@@ -1794,7 +2017,18 @@
                 const currentSelected = targetStoreName || (storeSelect ? storeSelect.value : "南崁中正") || "南崁中正";
                 const optHtml = cloudStores.map(s => `<option value="${s}" ${s === currentSelected ? 'selected' : ''}>${s}</option>`).join('');
                 if (storeSelect) storeSelect.innerHTML = optHtml;
-                if (portalSelect) portalSelect.innerHTML = optHtml;
+                if (portalSelect) {
+                    portalSelect.innerHTML = optHtml;
+                    portalSelect.disabled = false;
+                    portalSelect.classList.remove('loading-pulse');
+                }
+                if (portalPwd) {
+                    portalPwd.disabled = false;
+                    portalPwd.placeholder = "請輸入門市密碼";
+                }
+                if (portalBtn) {
+                    portalBtn.disabled = false;
+                }
 
                 if (!targetStoreName) return;
 
@@ -1811,13 +2045,23 @@
             }
         }
 
-        // 💡 2. 首頁密碼驗證登入 (依據選擇的門市與雲端最高密碼進行驗證)
+        // 💡 2. 首頁密碼驗證登入 (加入登入中呼吸動畫與即時狀態回饋)
         async function executePortalLogin() {
             const storeName = document.getElementById('portalStoreSelect').value;
             const inputPassword = document.getElementById('portalPasswordInput').value.trim();
+            const portalBtn = document.getElementById('btnPortalSubmit');
 
             if (!storeName) return alert("請選擇欲登入之店家！");
             if (!inputPassword) return alert("請輸入該門市登入密碼！");
+
+            // 💡 觸發按鈕動畫與鎖定
+            let originalBtnText = "進入系統";
+            if (portalBtn) {
+                originalBtnText = portalBtn.innerText;
+                portalBtn.disabled = true;
+                portalBtn.innerHTML = `<span>⏳ 驗證登入中...</span>`;
+                portalBtn.classList.add('loading-pulse');
+            }
 
             showLoading(`正在驗證【${storeName}】門市權限...`);
 
@@ -1831,6 +2075,11 @@
 
                 if (!result.success) {
                     hideLoading();
+                    if (portalBtn) {
+                        portalBtn.disabled = false;
+                        portalBtn.innerText = originalBtnText;
+                        portalBtn.classList.remove('loading-pulse');
+                    }
                     return alert("❌ 密碼錯誤！無法登入該門市。");
                 }
 
@@ -1860,7 +2109,7 @@
                     }
                 }
 
-                // 登入成功後向後端載入該店資料
+                // 登入成功後載入店家資料
                 const sRes = await fetch(`${API_BASE_URL}/api/store/${encodeURIComponent(storeName)}`);
                 const sData = await sRes.json();
                 applyDataToState(sData, storeName);
@@ -1872,6 +2121,11 @@
                 alert("登入過程發生錯誤：" + (err.message || err));
             } finally {
                 hideLoading();
+                if (portalBtn) {
+                    portalBtn.disabled = false;
+                    portalBtn.innerText = originalBtnText;
+                    portalBtn.classList.remove('loading-pulse');
+                }
             }
         }
 

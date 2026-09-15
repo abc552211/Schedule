@@ -12,6 +12,9 @@
     <!-- 💡 載入支援彩色樣式之 xlsx-js-style 套件 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
 
+    <!-- 💡 載入流暢平滑拖曳動畫套件 (SortableJS) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
 
     
     <link rel="icon" type="image/png" href="https://i.postimg.cc/d0mwmM8H/LOGO-she-ji.png">
@@ -96,19 +99,18 @@
             transition: transform 0.2s ease;
         }
 
-        /* 💡 班表整體設定：最外框加粗 2px，視覺更立體 */
+        /* 💡 班表整體設定：採用 separate + 0間距，徹底根除線條粗細不均與重疊吞線 */
         table#scheduleTable {
-            border-collapse: collapse;
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
             width: 100% !important;
             text-align: center;
             white-space: nowrap;
             table-layout: auto;
-            border: 2px solid #64748b !important;
-            /* 👈 【最外框加粗】：可調整 2px 或 2.5px，色碼 #64748b 為深灰藍質感框 */
+            border-top: 1.5px solid #64748b !important;
+            border-left: 1.5px solid #64748b !important;
             box-sizing: border-box;
         }
-
-
 
         .day-col {
             width: auto !important;
@@ -172,14 +174,31 @@
             color: #b71c1c !important;
         }
 
-        /* 💡 班表內部格線顏色與單元格設定 */
-        th,
-        td {
-            border: 0.5px solid #63686e !important;
-            /* 👈 【內部格線顏色】：#cbd5e1 是清晰柔和灰 (若想更深可改 #94a3b8，若想更淡可改 #e2e8f0) */
+        /* 💡 統一單向線條：只畫右與下邊框，確保絕對等寬 1px 不重疊 */
+        table#scheduleTable th,
+        table#scheduleTable td {
+            border-top: none !important;
+            border-left: none !important;
+            border-right: 1px solid #94a3b8 !important;
+            border-bottom: 1px solid #94a3b8 !important;
             padding: 0 !important;
             box-sizing: border-box;
             vertical-align: middle;
+        }
+
+        /* 💡 班別資料/人力/人員/變形工時：新增列與資料最底分開間隔（莫蘭迪綠質感風格） */
+        .card table {
+            border-collapse: collapse;
+        }
+        .card table th,
+        .card table td {
+            border: 1px solid #cbd5e1 !important;
+            padding: 4px !important;
+        }
+        .card table tfoot tr:first-child td {
+            border-top: 3px solid #4a6b5d !important;
+            padding-top: 10px !important;
+            background-color: #f9fbf9;
         }
 
         th {
@@ -318,7 +337,7 @@
             font-size: 12px;
         }
 
-        /* 💡 蜂巢選色器按鈕與面板樣式 */
+        /* 💡 經典蜂巢六角形選色器按鈕與彈窗 */
         .color-preview-btn {
             width: 26px;
             height: 22px;
@@ -340,54 +359,144 @@
             position: absolute;
             z-index: 10000;
             background: #ffffff;
-            border: 1px solid #ccc;
-            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
             padding: 10px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-            width: 220px;
-            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 260px;
+            box-sizing: border-box;
+            user-select: none;
         }
 
-        .honeycomb-grid {
+        .honeycomb-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .honeycomb-row {
             display: flex;
             justify-content: center;
-            gap: 3px;
+            margin-top: -3.5px;
+        }
+
+        .honeycomb-row:first-child {
+            margin-top: 0;
         }
 
         .honeycomb-cell {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
+            width: 17px;
+            height: 19px;
+            margin: 0 1.5px;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
             cursor: pointer;
             box-sizing: border-box;
-            border: 1px solid rgba(0, 0, 0, 0.15);
-            transition: transform 0.15s, box-shadow 0.15s;
+            transition: transform 0.15s, filter 0.15s;
         }
 
         .honeycomb-cell:hover {
             transform: scale(1.35);
-            z-index: 2;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.4);
-            border: 1.5px solid #fff;
+            z-index: 5;
+            filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
         }
 
-        .honeycomb-custom-row {
+        /* 💡 2D 漸層調色板與彩虹條樣式 */
+        .color-map-wrapper {
+            position: relative;
+            width: 190px;
+            height: 150px;
+            cursor: crosshair;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #94a3b8;
+        }
+
+        .color-map-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .color-map-white {
+            background: linear-gradient(to right, #fff, rgba(255,255,255,0));
+        }
+
+        .color-map-black {
+            background: linear-gradient(to top, #000, rgba(0,0,0,0));
+        }
+
+        .color-map-pointer {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1.5px solid #fff;
+            box-shadow: 0 0 2px #000;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .hue-slider-wrapper {
+            position: relative;
+            width: 24px;
+            height: 150px;
+            border-radius: 4px;
+            cursor: pointer;
+            background: linear-gradient(to bottom, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+            border: 1px solid #94a3b8;
+        }
+
+        .hue-slider-pointer {
+            position: absolute;
+            left: -3px;
+            width: 28px;
+            height: 4px;
+            border: 1.5px solid #fff;
+            box-shadow: 0 0 2px #000;
+            background: transparent;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        .custom-colors-section {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 6px;
+            margin-top: 6px;
+        }
+
+        .custom-colors-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-top: 1px solid #eee;
-            padding-top: 6px;
-            margin-top: 4px;
             font-size: 11px;
-            color: #666;
+            color: #475569;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .custom-colors-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            min-height: 18px;
+        }
+
+        .custom-color-chip {
+            width: 17px;
+            height: 17px;
+            border-radius: 3px;
+            cursor: pointer;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+            transition: transform 0.1s;
+        }
+
+        .custom-color-chip:hover {
+            transform: scale(1.25);
+            box-shadow: 0 0 3px rgba(0,0,0,0.4);
         }
 
         .btn {
@@ -1069,12 +1178,13 @@
             <div class="card">
                 <table style="width: auto;">
                     <thead>
-                        <!-- 💡 新增了最後一欄：對照簡寫 -->
                         <tr>
                             <th>名稱</th>
                             <th>畫面簡寫</th>
                             <th>職位</th>
                             <th>飛騰代碼</th>
+                            <th>字級</th>
+                            <th>粗體</th>
                             <th>文字色</th>
                             <th>背景色</th>
                             <th>涵蓋時段</th>
@@ -1089,14 +1199,21 @@
                     <tbody id="shiftCodesBody"></tbody>
                     <tfoot>
                         <tr>
-                            <td><input type="text" id="newShiftName" class="edit-input" style="width:80px"
-                                    placeholder="名稱"></td>
-                            <td><input type="text" id="newShiftKey" class="edit-input" style="width:50px"
-                                    placeholder="簡寫"></td>
-                            <td><input type="text" id="newShiftPos" class="edit-input" style="width:50px" value="通用">
+                            <td><span style="font-size:10px; color:#2563eb; font-weight:bold; display:block; margin-bottom:2px;">[新增]</span><input type="text" id="newShiftName" class="edit-input" style="width:70px" placeholder="名稱"></td>
+                            <td><input type="text" id="newShiftKey" class="edit-input" style="width:45px" placeholder="簡寫"></td>
+                            <td><input type="text" id="newShiftPos" class="edit-input" style="width:45px" value="通用"></td>
+                            <td><input type="text" id="newShiftCode" class="edit-input" style="width:65px" placeholder="代碼"></td>
+                            <td>
+                                <select id="newShiftFontSize" class="edit-input" style="width:52px; font-size:11px;">
+                                    <option value="11px">11px</option>
+                                    <option value="12px">12px</option>
+                                    <option value="13px" selected>13px</option>
+                                    <option value="14px">14px</option>
+                                    <option value="15px">15px</option>
+                                    <option value="16px">16px</option>
+                                </select>
                             </td>
-                            <td><input type="text" id="newShiftCode" class="edit-input" style="width:70px"
-                                    placeholder="代碼"></td>
+                            <td style="text-align:center;"><input type="checkbox" id="newShiftBold" checked style="cursor:pointer;"></td>
                             <td>
                                 <input type="hidden" id="newTextColor" value="#ffffff">
                                 <div id="newTextColorBtn" class="color-preview-btn" style="background-color: #ffffff;"
@@ -1107,18 +1224,12 @@
                                 <div id="newBgColorBtn" class="color-preview-btn" style="background-color: #2196f3;"
                                     onclick="openHoneycombPicker(event, 'new', 'bg')" title="選擇背景色"></div>
                             </td>
-                            <td><input type="text" id="newShiftCover" class="edit-input" style="width:80px"
-                                    placeholder="A,B,C"></td>
-                            <td><input type="number" id="newShiftOT" class="edit-input" style="width:40px" step="0.5"
-                                    value="0"></td>
-                            <td><input type="number" id="newShiftAL" class="edit-input" style="width:40px" step="0.5"
-                                    value="0"></td>
-                            <td><input type="number" id="newShiftCL" class="edit-input" style="width:40px" step="0.5"
-                                    value="0"></td>
-                            <td><input type="checkbox" id="newShiftAutoAssign" checked
-                                    style="cursor:pointer; transform:scale(1.2);"></td>
+                            <td><input type="text" id="newShiftCover" class="edit-input" style="width:70px" placeholder="A,B,C"></td>
+                            <td><input type="number" id="newShiftOT" class="edit-input" style="width:38px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newShiftAL" class="edit-input" style="width:38px" step="0.5" value="0"></td>
+                            <td><input type="number" id="newShiftCL" class="edit-input" style="width:38px" step="0.5" value="0"></td>
+                            <td style="text-align:center;"><input type="checkbox" id="newShiftAutoAssign" checked style="cursor:pointer; transform:scale(1.1);"></td>
                             <td><button class="btn btn-primary" onclick="addShiftCode()">新增</button></td>
-                            <!-- 💡 配合對齊增加的一格空欄 -->
                             <td style="color:#ccc; text-align:center;">-</td>
                         </tr>
                     </tfoot>
@@ -1369,15 +1480,56 @@
             </div>
         </div>
     </div>
-    <!-- 💡 蜂巢調色盤彈出視窗容器 -->
+    <!-- 💡 蜂巢調色盤彈出視窗容器 (含蜂巢盤、可折疊2D漸層調色板與暫存) -->
     <div id="honeycombPicker" class="honeycomb-picker-popup">
-        <div style="font-size: 11px; font-weight: bold; color: #444; margin-bottom: 6px; text-align: left;">🎨 選擇顏色
+        <div style="font-size: 11px; font-weight: bold; color: #334155; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🎨 蜂巢調色盤</span>
+            <span style="font-size: 11px; color: #94a3b8; cursor: pointer;" onclick="closeHoneycombPicker()">✕ 關閉</span>
         </div>
-        <div class="honeycomb-grid" id="honeycombGrid"></div>
-        <div class="honeycomb-custom-row">
-            <span>自訂色碼:</span>
-            <input type="color" id="honeycombNativeColor" style="width:24px; height:20px; border:none; cursor:pointer;"
-                onchange="selectHoneycombColor(this.value)">
+        
+        <!-- 1. 蜂巢格狀快速選色 -->
+        <div class="honeycomb-container" id="honeycombGrid"></div>
+
+        <!-- 2. 可收合/展開之 2D 漸層調色區 (省空間) -->
+        <div style="margin-top: 4px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 11px; color: #0284c7; font-weight: bold;" onclick="toggleAdvancedPicker()">
+                <span id="advancedPickerToggleText">▼ 開啟進階 2D 調色盤</span>
+            </div>
+
+            <div id="advancedPickerContainer" style="display: none; margin-top: 6px;">
+                <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+                    <!-- 2D 漸層主板 -->
+                    <div id="colorMapWrapper" class="color-map-wrapper">
+                        <div id="colorMapBase" class="color-map-bg" style="background-color: #ff0000;"></div>
+                        <div class="color-map-bg color-map-white"></div>
+                        <div class="color-map-bg color-map-black"></div>
+                        <div id="colorMapPointer" class="color-map-pointer" style="left: 100%; top: 0%;"></div>
+                    </div>
+
+                    <!-- 彩虹色相條 -->
+                    <div id="hueSliderWrapper" class="hue-slider-wrapper">
+                        <div id="hueSliderPointer" class="hue-slider-pointer" style="top: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- 預覽色、HEX 色碼、確定按鈕 -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <div id="pickerColorPreview" style="width: 22px; height: 22px; border-radius: 4px; border: 1px solid #cbd5e1; box-shadow: inset 0 0 3px rgba(0,0,0,0.2);"></div>
+                        <input type="text" id="pickerHexInput" style="width: 65px; font-size: 11px; padding: 2px 4px; border: 1px solid #ccc; border-radius: 3px; font-family: monospace; text-align: center;" value="#FF0000" onchange="syncFromHexInput(this.value)">
+                    </div>
+                    <button type="button" class="btn btn-primary" style="padding: 2px 10px; font-size: 11px; margin: 0;" onclick="apply2DColor()">確定套用</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 瀏覽器暫存自訂色彩區 -->
+        <div class="custom-colors-section">
+            <div class="custom-colors-header">
+                <span>自訂與常用色 (暫存):</span>
+                <button type="button" style="background:none; border:none; color:#dc3545; cursor:pointer; font-size:10px; padding:0;" onclick="clearSavedColors()" title="清空暫存色">清空</button>
+            </div>
+            <div class="custom-colors-grid" id="customColorsGrid"></div>
         </div>
     </div>
 
@@ -1706,18 +1858,23 @@
             }
         }
 
-        // 💡 原圖檔下載邏輯 (包含是否隱藏人力提示詢問)
+        // 💡 升級版圖檔下載：修正邊框抗鋸齒，解決格線粗細不一與吃線問題
         async function executeImageDownload() {
             const hideAlert = confirm("截圖是否要【隱藏】上方的【人力提示】？\n\n・按「確定」：隱藏人力提示\n・按「取消」：顯示人力提示");
 
             showLoading("正在生成高畫質班表截圖...");
             const tableElement = document.getElementById('scheduleTable');
+            const scaler = document.getElementById('scheduleScaler');
             const scrollWrapper = tableElement.closest('div[style*="overflow-x: auto"]');
 
             const dateVal = document.getElementById('schedule-month').value;
             const [year, month] = dateVal.split('-');
             const storeName = document.getElementById('globalStore').value || "";
             const fileNameStr = `${year}${month}${storeName}`;
+
+            // 截圖前暫時解除 Zoom 縮放，防 Sub-pixel 導致的邊框遺失
+            const origTransform = scaler ? scaler.style.transform : '';
+            if (scaler) scaler.style.transform = 'scale(1)';
 
             document.querySelectorAll('.val-icon').forEach(el => el.style.display = 'none');
             const alertRow = document.querySelector('.alert-row');
@@ -1737,9 +1894,6 @@
 
             const originalOverflow = scrollWrapper ? scrollWrapper.style.overflowX : '';
             if (scrollWrapper) scrollWrapper.style.overflowX = 'visible';
-
-            const origPadding = tableElement.style.padding;
-            tableElement.style.padding = '2px';
 
             document.querySelectorAll('.cell-input, .remark-input').forEach(input => {
                 const isRemark = input.classList.contains('remark-input');
@@ -1781,12 +1935,16 @@
 
             try {
                 const canvas = await html2canvas(tableElement, {
-                    scale: 3,
+                    scale: 2,
                     backgroundColor: "#ffffff",
                     useCORS: true,
-                    logging: false
+                    logging: false,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: tableElement.scrollWidth
                 });
 
+                if (scaler) scaler.style.transform = origTransform;
                 if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
                 if (alertRow) alertRow.style.display = origAlertDisplay;
                 if (hideAlert) {
@@ -1795,8 +1953,6 @@
                     });
                 }
                 document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
-                tableElement.style.padding = origPadding;
-
                 document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
                 document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
 
@@ -1804,11 +1960,10 @@
                 downloadJPG(canvas, fileNameStr);
 
             } catch (err) {
+                if (scaler) scaler.style.transform = origTransform;
                 if (scrollWrapper) scrollWrapper.style.overflowX = originalOverflow;
                 if (alertRow) alertRow.style.display = origAlertDisplay;
                 document.querySelectorAll('.val-icon').forEach(el => el.style.display = '');
-                tableElement.style.padding = origPadding;
-
                 document.querySelectorAll('.temp-span-for-capture').forEach(span => span.remove());
                 document.querySelectorAll('.cell-input, .remark-input').forEach(input => input.style.display = '');
 
@@ -1817,7 +1972,7 @@
             }
         }
 
-        // 💡 匯出高質感彩色班表 Excel (自動排除人力提示列，精準對位表頭與六日色彩)
+        // 💡 匯出高質感彩色班表 Excel：支援備註列高、下方日期/星期色彩與出勤統計完整上色
         function exportStyledScheduleExcel() {
             const tableElement = document.getElementById('scheduleTable');
             if (!tableElement) return alert("找不到班表表格！");
@@ -1828,12 +1983,13 @@
             const strMonth = String(month).padStart(2, '0');
             const daysInMonth = new Date(year, month, 0).getDate();
 
-            // 1. 深度複製真實網頁表格並移除人力提示與檢核符號
+            // 取得目前備註倍率
+            const remarkMultiplier = Number(document.getElementById('remarkHeightSelect') ? document.getElementById('remarkHeightSelect').value : 2) || 2;
+
             const cloneTable = tableElement.cloneNode(true);
             cloneTable.querySelectorAll('.alert-row').forEach(el => el.remove());
             cloneTable.querySelectorAll('.val-icon').forEach(el => el.remove());
 
-            // 2. 將輸入框與多行文字轉為純文字
             cloneTable.querySelectorAll('input.cell-input').forEach(input => {
                 const td = input.closest('td');
                 if (td) td.innerText = (input.value || '').trim();
@@ -1844,8 +2000,8 @@
                 if (td) td.innerText = (ta.value || '').trim();
             });
 
-            // 3. 建立班別色彩對照表
-            const colorLookup = {};
+            // 班別色彩、字級與粗體對照表
+            const shiftStyleLookup = {};
             (state.shiftMap || []).forEach(m => {
                 if (m.key) {
                     const cleanKey = m.key.trim();
@@ -1853,48 +2009,77 @@
                     let fg = (m.textColor || '#000000').replace('#', '').trim();
                     if (bg.length === 3) bg = bg.split('').map(c => c + c).join('');
                     if (fg.length === 3) fg = fg.split('').map(c => c + c).join('');
-                    colorLookup[cleanKey] = { bg: bg.toUpperCase(), fg: fg.toUpperCase() };
+                    const sz = m.fontSize ? parseFloat(m.fontSize) : 10;
+                    const isBold = (m.bold !== undefined) ? m.bold : true;
+                    shiftStyleLookup[cleanKey] = { bg: bg.toUpperCase(), fg: fg.toUpperCase(), sz: sz, bold: isBold };
                 }
             });
 
-            // 4. 解析為工作表結構
             const ws = XLSX.utils.table_to_sheet(cloneTable, { raw: true });
             const range = XLSX.utils.decode_range(ws['!ref']);
 
-            // 5. 設定欄寬
+            // 設定欄寬
             ws['!cols'] = [{ wch: 12 }];
             for (let c = 1; c <= range.e.c; c++) {
                 ws['!cols'].push({ wch: (c > daysInMonth) ? 5.5 : 4.5 });
             }
 
-            // 6. 逐格以精確業務規則上色
+            // 找出下方區塊（日期、星期、各出勤列）的起始列索引
+            const rowLabels = [];
+            for (let r = 0; r <= range.e.r; r++) {
+                const aCell = ws[XLSX.utils.encode_cell({ r: r, c: 0 })];
+                rowLabels.push(aCell ? String(aCell.v || '').trim() : '');
+            }
+
+            // 設定列高：精確判定備註列才放大，星期列與出勤列保持精簡 20pt
+            ws['!rows'] = [];
+            for (let r = 0; r <= range.e.r; r++) {
+                const label = rowLabels[r];
+                const isBottomSection = ['日期', '星期', 'A出勤', 'B出勤', 'C出勤'].some(name => label.includes(name));
+
+                if (r === 1) {
+                    ws['!rows'].push({ hpt: 20 * remarkMultiplier }); // 全店備註列
+                } else if (!isBottomSection && r >= 4 && r % 2 === 1) {
+                    ws['!rows'].push({ hpt: 20 * remarkMultiplier }); // 員工備註列
+                } else {
+                    ws['!rows'].push({ hpt: 20 }); // 一般班別、日期、星期、出勤統計皆為 20pt
+                }
+            }
+
+            // 逐格套用樣式與邊框
             for (let R = range.s.r; R <= range.e.r; ++R) {
+                const rowLabel = rowLabels[R];
+
                 for (let C = range.s.c; C <= range.e.c; ++C) {
                     const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-                    if (!ws[cellAddress]) continue;
+                    if (!ws[cellAddress]) {
+                        ws[cellAddress] = { t: 's', v: '' }; // 保障空儲存格也有框線
+                    }
 
                     const val = String(ws[cellAddress].v || '').trim();
 
-                    // 基本樣式：微軟正黑體、置中、柔和框線
+                    // 統一標準單一細灰線
+                    const uniformBorder = {
+                        top: { style: "thin", color: { rgb: "94A3B8" } },
+                        bottom: { style: "thin", color: { rgb: "94A3B8" } },
+                        left: { style: "thin", color: { rgb: "94A3B8" } },
+                        right: { style: "thin", color: { rgb: "94A3B8" } }
+                    };
+
                     const cellStyle = {
                         alignment: { horizontal: "center", vertical: "center", wrapText: true },
-                        border: {
-                            top: { style: "thin", color: { rgb: "B0BEC5" } },
-                            bottom: { style: "thin", color: { rgb: "B0BEC5" } },
-                            left: { style: "thin", color: { rgb: "B0BEC5" } },
-                            right: { style: "thin", color: { rgb: "B0BEC5" } }
-                        },
+                        border: uniformBorder,
                         font: { name: "Microsoft JhengHei", sz: 9.5 }
                     };
 
-                    // R=0: 提醒事項列 (黃底)
+                    // 1. 提醒事項列
                     if (R === 0) {
                         cellStyle.fill = { fgColor: { rgb: "FFF3CD" } };
                         cellStyle.font.color = { rgb: "856404" };
                         cellStyle.font.bold = true;
                         if (C === 1) cellStyle.alignment.horizontal = "left";
                     }
-                    // R=1: 備註列 (極淡灰底)
+                    // 2. 最上方備註列
                     else if (R === 1) {
                         cellStyle.fill = { fgColor: { rgb: "F9F9F9" } };
                         if (C === 0) {
@@ -1902,9 +2087,9 @@
                             cellStyle.font.color = { rgb: "555555" };
                         }
                     }
-                    // R=2: 日期列 (整排鵝黃底，週六藍字、週日紅字、其餘深灰字)
-                    else if (R === 2) {
-                        cellStyle.fill = { fgColor: { rgb: "FFF176" } };
+                    // 3. 日期列 (上方表頭 R===2 或 下方底部日期列)
+                    else if (R === 2 || rowLabel === '日期') {
+                        cellStyle.fill = { fgColor: { rgb: "FFF176" } }; // 鵝黃底
                         cellStyle.font.bold = true;
                         if (C === 0) {
                             cellStyle.font.color = { rgb: "0070C0" };
@@ -1913,52 +2098,72 @@
                             const dWeek = new Date(year, month - 1, C).getDay();
                             if (dWeek === 6) cellStyle.font.color = { rgb: "0D47A1" };      // 週六藍字
                             else if (dWeek === 0) cellStyle.font.color = { rgb: "B71C1C" }; // 週日紅字
-                            else cellStyle.font.color = { rgb: "333333" };                 // 平日深灰字
+                            else cellStyle.font.color = { rgb: "333333" };
                         } else {
                             cellStyle.font.color = { rgb: "333333" };
                         }
                     }
-                    // R=3: 星期列 (平日淡綠底綠字、週六淡藍底藍字、週日淡粉底紅字)
-                    else if (R === 3) {
+                    // 4. 星期列 (上方表頭 R===3 或 下方底部星期列)
+                    else if (R === 3 || rowLabel === '星期') {
                         cellStyle.font.bold = true;
-                        if (C >= 1 && C <= daysInMonth) {
+                        if (C === 0) {
+                            cellStyle.fill = { fgColor: { rgb: "C8E6C9" } };
+                            cellStyle.font.color = { rgb: "1B5E20" };
+                        } else if (C >= 1 && C <= daysInMonth) {
                             const dWeek = new Date(year, month - 1, C).getDay();
                             if (dWeek === 6) {
                                 cellStyle.fill = { fgColor: { rgb: "BBDEFB" } }; // 週六淡藍底
-                                cellStyle.font.color = { rgb: "0D47A1" };       // 藍字
+                                cellStyle.font.color = { rgb: "0D47A1" };
                             } else if (dWeek === 0) {
                                 cellStyle.fill = { fgColor: { rgb: "FFCDD2" } }; // 週日淡粉紅底
-                                cellStyle.font.color = { rgb: "B71C1C" };       // 紅字
+                                cellStyle.font.color = { rgb: "B71C1C" };
                             } else {
                                 cellStyle.fill = { fgColor: { rgb: "C8E6C9" } }; // 平日淡綠底
-                                cellStyle.font.color = { rgb: "1B5E20" };       // 深綠字
+                                cellStyle.font.color = { rgb: "1B5E20" };
                             }
                         } else {
                             cellStyle.fill = { fgColor: { rgb: "FFF176" } };
                             cellStyle.font.color = { rgb: "333333" };
                         }
                     }
-                    // R >= 4: 員工班表列
+                    // 5. 下方出勤統計列 (A出勤 / B出勤 / C出勤)
+                    else if (rowLabel.includes('出勤')) {
+                        cellStyle.fill = { fgColor: { rgb: "FFFDE7" } }; // 統計專用淡黃底 (--stat-bg)
+                        cellStyle.font.bold = true;
+                        if (C === 0) {
+                            cellStyle.font.color = { rgb: "0070C0" };
+                        } else if (C >= 1 && C <= daysInMonth) {
+                            const dWeek = new Date(year, month - 1, C).getDay();
+                            const reqIdx = (dWeek === 0) ? 6 : dWeek - 1;
+                            const cls = rowLabel.replace('出勤', '').trim().toUpperCase();
+                            const mpConfig = (state.manpower || []).find(m => (m.class || '').toUpperCase() === cls);
+                            const targetReq = mpConfig ? (Number(mpConfig.reqs[reqIdx]) || 0) : 0;
+                            const countNum = Number(val) || 0;
+
+                            // 未達最低需求人數標紅字
+                            if (targetReq > 0 && countNum < targetReq) {
+                                cellStyle.font.color = { rgb: "B71C1C" };
+                            } else {
+                                cellStyle.font.color = { rgb: "333333" };
+                            }
+                        }
+                    }
+                    // 6. 員工班表資料列
                     else {
-                        // 姓名欄 (A欄)
                         if (C === 0) {
                             cellStyle.font.bold = true;
                             cellStyle.font.color = { rgb: "0D6EFD" };
                             cellStyle.fill = { fgColor: { rgb: "FFFFFF" } };
-                        }
-                        // 右側統計欄位
-                        else if (C > daysInMonth) {
+                        } else if (C > daysInMonth) {
                             cellStyle.fill = { fgColor: { rgb: "FFFFFF" } };
                             if (C === daysInMonth + 1) cellStyle.font.bold = true; // 實休加粗
-                        }
-                        // 班別儲存格 (按班別速查表填色)
-                        else if (colorLookup[val]) {
-                            cellStyle.fill = { fgColor: { rgb: colorLookup[val].bg } };
-                            cellStyle.font.color = { rgb: colorLookup[val].fg };
-                            cellStyle.font.bold = true;
-                        }
-                        // 空白格：排班列白底，備註列極淡灰底
-                        else {
+                        } else if (shiftStyleLookup[val]) {
+                            const conf = shiftStyleLookup[val];
+                            cellStyle.fill = { fgColor: { rgb: conf.bg } };
+                            cellStyle.font.color = { rgb: conf.fg };
+                            cellStyle.font.bold = conf.bold;
+                            cellStyle.font.sz = conf.sz;
+                        } else {
                             const isShiftRow = (R % 2 === 0);
                             cellStyle.fill = { fgColor: { rgb: isShiftRow ? "FFFFFF" : "F9F9F9" } };
                         }
@@ -1968,12 +2173,11 @@
                 }
             }
 
-            // 7. 匯出 Excel
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, `${globalStore}_${year}${strMonth}`);
             const fileName = `${year}${strMonth}_${globalStore}_完整班表.xlsx`;
             XLSX.writeFile(wb, fileName);
-            showToast(`✅ 已匯出無人力提示的完整彩色班表：${fileName}`);
+            showToast(`✅ 已匯出完整配色與正確列高之班表：${fileName}`);
         }
 
         // 💡 乾淨單純的 JPG 下載函式 (去除了原本剪貼簿多餘的邏輯)
@@ -2590,9 +2794,12 @@
                     if (['休', '例', '國'].includes(s)) realOff++;
 
                     let map = state.shiftMap.find(m => m.key === s && isPositionMatch(m.pos, emp.pos));
-                    let styleStr = map ? `color:${map.textColor}; background-color:${map.bgColor};` : '';
-
+                    let styleStr = '';
                     if (map) {
+                        const fSize = map.fontSize || '13px';
+                        const fWeight = (map.bold !== false) ? 'bold' : 'normal';
+                        styleStr = `color:${map.textColor}; background-color:${map.bgColor}; font-size:${fSize}; font-weight:${fWeight};`;
+
                         let dailyAL = Number(map.al) || 0;
                         let dailyCL = Number(map.cl) || 0;
                         let dailyOT = Number(map.ot) || 0;
@@ -2778,18 +2985,35 @@
             }
         }
 
+        let shiftSortableInstance = null;
         function renderShiftCodes() {
             const tbody = document.getElementById('shiftCodesBody');
             if (!tbody) return;
-            tbody.innerHTML = state.shiftMap.map((s, i) => `
-                <tr draggable="true" ondragstart="handleDragStart(event, 'shift', ${i})" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'shift', ${i})" ondragend="handleDragEnd(event)">
+            tbody.innerHTML = state.shiftMap.map((s, i) => {
+                const fSize = s.fontSize || '13px';
+                const isBold = (s.bold !== undefined) ? s.bold : true;
+                return `
+                <tr data-index="${i}">
                     <td>
                         <span class="drag-handle" title="按住拖曳調整順序">☰</span>
-                        <input class="edit-input" style="width:75px" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value">
+                        <input class="edit-input" style="width:70px" value="${s.name}" onchange="state.shiftMap[${i}].name=this.value">
                     </td>
-                    <td><input class="edit-input" style="width:50px" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:50px" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
-                    <td><input class="edit-input" style="width:70px" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
+                    <td><input class="edit-input" style="width:45px" value="${s.key}" onchange="state.shiftMap[${i}].key=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:45px" value="${s.pos}" onchange="state.shiftMap[${i}].pos=this.value; renderSchedule();"></td>
+                    <td><input class="edit-input" style="width:65px" value="${s.code}" onchange="state.shiftMap[${i}].code=this.value"></td>
+                    <td>
+                        <select class="edit-input" style="width:52px; font-size:11px;" onchange="state.shiftMap[${i}].fontSize=this.value; renderShiftCodes(); renderSchedule();">
+                            <option value="11px" ${fSize==='11px'?'selected':''}>11px</option>
+                            <option value="12px" ${fSize==='12px'?'selected':''}>12px</option>
+                            <option value="13px" ${fSize==='13px'?'selected':''}>13px</option>
+                            <option value="14px" ${fSize==='14px'?'selected':''}>14px</option>
+                            <option value="15px" ${fSize==='15px'?'selected':''}>15px</option>
+                            <option value="16px" ${fSize==='16px'?'selected':''}>16px</option>
+                        </select>
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="checkbox" ${isBold ? 'checked' : ''} style="cursor:pointer;" onchange="state.shiftMap[${i}].bold=this.checked; renderShiftCodes(); renderSchedule();">
+                    </td>
                     <td>
                         <div class="color-preview-btn" style="background-color: ${s.textColor};" onclick="openHoneycombPicker(event, ${i}, 'textColor')" title="點擊選擇文字色"></div>
                     </td>
@@ -2797,52 +3021,267 @@
                         <div class="color-preview-btn" style="background-color: ${s.bgColor};" onclick="openHoneycombPicker(event, ${i}, 'bgColor')" title="點擊選擇背景色"></div>
                     </td>
                     <td><input class="edit-input" style="width:70px" value="${s.cover || ''}" placeholder="如:A,B,C" onchange="state.shiftMap[${i}].cover=this.value; renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.ot}" onchange="state.shiftMap[${i}].ot=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.al}" onchange="state.shiftMap[${i}].al=Number(this.value); renderSchedule();"></td>
-                    <td><input type="number" class="edit-input" style="width:40px" step="0.5" value="${s.cl}" onchange="state.shiftMap[${i}].cl=Number(this.value); renderSchedule();"></td>
-                    <td><input type="checkbox" ${s.autoAssign !== false ? 'checked' : ''} style="cursor:pointer; transform:scale(1.2);" onchange="state.shiftMap[${i}].autoAssign=this.checked;"></td>
+                    <td><input type="number" class="edit-input" style="width:38px" step="0.5" value="${s.ot}" onchange="state.shiftMap[${i}].ot=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:38px" step="0.5" value="${s.al}" onchange="state.shiftMap[${i}].al=Number(this.value); renderSchedule();"></td>
+                    <td><input type="number" class="edit-input" style="width:38px" step="0.5" value="${s.cl}" onchange="state.shiftMap[${i}].cl=Number(this.value); renderSchedule();"></td>
+                    <td style="text-align:center;"><input type="checkbox" ${s.autoAssign !== false ? 'checked' : ''} style="cursor:pointer; transform:scale(1.1);" onchange="state.shiftMap[${i}].autoAssign=this.checked;"></td>
                     <td><button class="btn btn-danger" onclick="delShiftCode(${i})">刪除</button></td>
-                    <td style="text-align:center; padding: 0 8px;">
-                        <span style="display:inline-block; width:100%; font-weight:bold; border-radius:3px; padding:2px 0; color:${s.textColor}; background-color:${s.bgColor};">
+                    <td style="text-align:center; padding: 0 4px;">
+                        <span style="display:inline-block; width:100%; border-radius:3px; padding:2px 0; color:${s.textColor}; background-color:${s.bgColor}; font-size:${fSize}; font-weight:${isBold ? 'bold' : 'normal'};">
                             ${s.key}
                         </span>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
             renderQuickRef();
+
+            if (shiftSortableInstance) {
+                shiftSortableInstance.destroy();
+            }
+            if (window.Sortable) {
+                shiftSortableInstance = new Sortable(tbody, {
+                    handle: '.drag-handle',
+                    animation: 200,
+                    ghostClass: 'dragging',
+                    onEnd: function (evt) {
+                        const fromIndex = evt.oldIndex;
+                        const toIndex = evt.newIndex;
+                        if (fromIndex === toIndex) return;
+
+                        const movedShift = state.shiftMap.splice(fromIndex, 1)[0];
+                        state.shiftMap.splice(toIndex, 0, movedShift);
+                        renderShiftCodes();
+                        renderSchedule();
+                        showToast("↕️ 班別順序已更新");
+                    }
+                });
+            }
         }
 
         // ==========================================
-        // 💡 經典蜂巢色彩資料與控制邏輯
+        // 💡 經典蜂巢六角幾何色譜、2D 漸層調色盤與瀏覽器暫存
         // ==========================================
-        const HONEYCOMB_PALETTE = [
+        const HONEYCOMB_HEX_ROWS = [
             ["#ffffff", "#cccccc", "#c0c0c0", "#999999", "#666666", "#333333", "#000000"],
-            ["#ffcccc", "#ff6666", "#ff0000", "#cc0000", "#990000", "#660000", "#330000"],
-            ["#ffe5cc", "#ffb266", "#ff8000", "#cc6600", "#994c00", "#663300", "#331900"],
-            ["#ffffcc", "#ffff66", "#ffff00", "#cccc00", "#999900", "#666600", "#333300"],
-            ["#e5ffcc", "#b2ff66", "#66ff00", "#4ccc00", "#399900", "#266600", "#133300"],
-            ["#ccffcc", "#66ff66", "#00ff00", "#00cc00", "#009900", "#006600", "#003300"],
-            ["#ccffe5", "#66ffb2", "#00ff80", "#00cc66", "#00994c", "#006633", "#003319"],
-            ["#ccffff", "#66ffff", "#00ffff", "#00cccc", "#009999", "#006666", "#003333"],
-            ["#cce5ff", "#66b2ff", "#0080ff", "#0066cc", "#004c99", "#003366", "#001933"],
-            ["#ccccff", "#6666ff", "#0000ff", "#0000cc", "#000099", "#000066", "#000033"],
-            ["#e5ccff", "#b266ff", "#7f00ff", "#6600cc", "#4c0099", "#330066", "#190033"],
-            ["#ffccff", "#ff66ff", "#ff00ff", "#cc00cc", "#990099", "#660066", "#330033"],
-            ["#ffcce5", "#ff66b2", "#ff007f", "#cc0066", "#99004c", "#660033", "#330019"]
+            ["#ffcccc", "#ff9999", "#ff6666", "#ff0000", "#cc0000", "#990000", "#660000", "#330000"],
+            ["#ffe5cc", "#ffcc99", "#ff9933", "#ff8000", "#cc6600", "#994c00", "#663300", "#331900", "#1a0c00"],
+            ["#ffffcc", "#ffff99", "#ffff66", "#ffff00", "#cccc00", "#999900", "#666600", "#333300"],
+            ["#e5ffcc", "#ccff99", "#99ff33", "#66ff00", "#4ccc00", "#399900", "#266600", "#133300", "#091900"],
+            ["#ccffcc", "#99ff99", "#66ff66", "#00ff00", "#00cc00", "#009900", "#006600", "#003300"],
+            ["#ccffe5", "#99ffcc", "#33ff99", "#00ff80", "#00cc66", "#00994c", "#006633", "#003319", "#00190c"],
+            ["#ccffff", "#99ffff", "#66ffff", "#00ffff", "#00cccc", "#009999", "#006666", "#003333"],
+            ["#cce5ff", "#99ccff", "#3399ff", "#0080ff", "#0066cc", "#004c99", "#003366", "#001933", "#000c1a"],
+            ["#ccccff", "#9999ff", "#6666ff", "#0000ff", "#0000cc", "#000099", "#000066", "#000033"],
+            ["#e5ccff", "#cc99ff", "#9933ff", "#7f00ff", "#6600cc", "#4c0099", "#330066", "#190033", "#0c001a"],
+            ["#ffccff", "#ff99ff", "#ff66ff", "#ff00ff", "#cc00cc", "#990099", "#660066", "#330033"],
+            ["#ffcce5", "#ff99cc", "#ff3399", "#ff007f", "#cc0066", "#99004c", "#660033", "#330019", "#1a000c"]
         ];
 
+        const STORAGE_KEY_CUSTOM_COLORS = "system_custom_palette_cache";
         let activeColorTarget = null;
+
+        // 當前 HSV 狀態 (H: 0~360, S: 0~1, V: 0~1)
+        let currentH = 0, currentS = 1, currentV = 1;
+
+        // 讀取瀏覽器暫存顏色
+        function getSavedColors() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY_CUSTOM_COLORS);
+                return stored ? JSON.parse(stored) : ["#2196f3", "#4caf50", "#ff9800", "#e91e63", "#9c27b0", "#00bcd4"];
+            } catch (e) {
+                return ["#2196f3", "#4caf50", "#ff9800", "#e91e63"];
+            }
+        }
+
+        function saveCustomColor(hex) {
+            if (!hex) return;
+            hex = hex.toUpperCase();
+            let colors = getSavedColors().filter(c => c.toUpperCase() !== hex);
+            colors.unshift(hex);
+            if (colors.length > 16) colors = colors.slice(0, 16);
+            try {
+                localStorage.setItem(STORAGE_KEY_CUSTOM_COLORS, JSON.stringify(colors));
+            } catch (e) {}
+            renderSavedColors();
+        }
+
+        function clearSavedColors() {
+            try {
+                localStorage.removeItem(STORAGE_KEY_CUSTOM_COLORS);
+            } catch (e) {}
+            renderSavedColors();
+            showToast("🧹 已清空暫存自訂色彩");
+        }
+
+        function renderSavedColors() {
+            const container = document.getElementById('customColorsGrid');
+            if (!container) return;
+            const colors = getSavedColors();
+            if (colors.length === 0) {
+                container.innerHTML = `<span style="font-size:10px; color:#94a3b8;">尚無暫存色</span>`;
+                return;
+            }
+            container.innerHTML = colors.map(c => `
+                <div class="custom-color-chip" style="background-color: ${c};" onclick="onPickColorDirectly('${c}')" title="${c}"></div>
+            `).join('');
+        }
 
         function initHoneycombGrid() {
             const grid = document.getElementById('honeycombGrid');
             if (!grid) return;
-            grid.innerHTML = HONEYCOMB_PALETTE.map(row => `
+            grid.innerHTML = HONEYCOMB_HEX_ROWS.map(row => `
                 <div class="honeycomb-row">
                     ${row.map(color => `
-                        <div class="honeycomb-cell" style="background-color: ${color};" onclick="selectHoneycombColor('${color}')" title="${color}"></div>
+                        <div class="honeycomb-cell" style="background-color: ${color};" onclick="onPickColorDirectly('${color}')" title="${color}"></div>
                     `).join('')}
                 </div>
             `).join('');
+            renderSavedColors();
+        }
+
+        // ==========================================
+        // 🎨 2D 畫布 HSV 數學與滑鼠拖曳邏輯
+        // ==========================================
+        function hsvToRgb(h, s, v) {
+            let r, g, b;
+            let i = Math.floor((h / 60) % 6);
+            let f = (h / 60) - i;
+            let p = v * (1 - s);
+            let q = v * (1 - f * s);
+            let t = v * (1 - (1 - f) * s);
+            switch (i) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+            const toHex = (c) => {
+                let h = Math.round(c * 255).toString(16);
+                return h.length === 1 ? '0' + h : h;
+            };
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+        }
+
+        function hexToHsv(hex) {
+            hex = hex.replace('#', '').trim();
+            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+            let r = parseInt(hex.substring(0, 2), 16) / 255;
+            let g = parseInt(hex.substring(2, 4), 16) / 255;
+            let b = parseInt(hex.substring(4, 6), 16) / 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, v = max;
+            let d = max - min;
+            s = max === 0 ? 0 : d / max;
+            if (max === min) {
+                h = 0;
+            } else {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s: s, v: v };
+        }
+
+        function update2DFromHsv() {
+            const baseColor = hsvToRgb(currentH, 1, 1);
+            document.getElementById('colorMapBase').style.backgroundColor = baseColor;
+
+            const curHex = hsvToRgb(currentH, currentS, currentV);
+            document.getElementById('pickerColorPreview').style.backgroundColor = curHex;
+            document.getElementById('pickerHexInput').value = curHex;
+
+            document.getElementById('colorMapPointer').style.left = `${currentS * 100}%`;
+            document.getElementById('colorMapPointer').style.top = `${(1 - currentV) * 100}%`;
+            document.getElementById('hueSliderPointer').style.top = `${(currentH / 360) * 100}%`;
+        }
+
+        function init2DColorPickers() {
+            const mapWrap = document.getElementById('colorMapWrapper');
+            const hueWrap = document.getElementById('hueSliderWrapper');
+            if (!mapWrap || !hueWrap) return;
+
+            let isDraggingMap = false;
+            let isDraggingHue = false;
+
+            const handleMapMove = (e) => {
+                const rect = mapWrap.getBoundingClientRect();
+                let x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+                let y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+                currentS = x / rect.width;
+                currentV = 1 - (y / rect.height);
+                update2DFromHsv();
+            };
+
+            const handleHueMove = (e) => {
+                const rect = hueWrap.getBoundingClientRect();
+                let y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+                currentH = Math.round((y / rect.height) * 360);
+                if (currentH >= 360) currentH = 0;
+                update2DFromHsv();
+            };
+
+            mapWrap.onmousedown = (e) => {
+                isDraggingMap = true;
+                handleMapMove(e);
+            };
+
+            hueWrap.onmousedown = (e) => {
+                isDraggingHue = true;
+                handleHueMove(e);
+            };
+
+            window.addEventListener('mousemove', (e) => {
+                if (isDraggingMap) handleMapMove(e);
+                if (isDraggingHue) handleHueMove(e);
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDraggingMap = false;
+                isDraggingHue = false;
+            });
+        }
+
+        // 折疊/展開 2D 面板 (省空間核心)
+        function toggleAdvancedPicker() {
+            const box = document.getElementById('advancedPickerContainer');
+            const txt = document.getElementById('advancedPickerToggleText');
+            if (!box) return;
+            const isHidden = box.style.display === 'none';
+            box.style.display = isHidden ? 'block' : 'none';
+            txt.innerText = isHidden ? '▲ 收合進階 2D 調色盤' : '▼ 開啟進階 2D 調色盤';
+        }
+
+        function syncFromHexInput(val) {
+            if (/^#?[0-9A-Fa-f]{6}$/.test(val)) {
+                if (!val.startsWith('#')) val = '#' + val;
+                const hsv = hexToHsv(val);
+                currentH = hsv.h;
+                currentS = hsv.s;
+                currentV = hsv.v;
+                update2DFromHsv();
+            }
+        }
+
+        function apply2DColor() {
+            const hex = hsvToRgb(currentH, currentS, currentV);
+            saveCustomColor(hex);
+            selectHoneycombColor(hex);
+            showToast(`🎨 已自訂並暫存顏色：${hex}`);
+        }
+
+        function onPickColorDirectly(hex) {
+            const hsv = hexToHsv(hex);
+            currentH = hsv.h;
+            currentS = hsv.s;
+            currentV = hsv.v;
+            update2DFromHsv();
+            selectHoneycombColor(hex);
         }
 
         function openHoneycombPicker(event, targetIdx, prop) {
@@ -2853,10 +3292,31 @@
             if (!picker) return;
 
             initHoneycombGrid();
+            init2DColorPickers();
+
+            // 讀取當前顏色並載入 2D 畫布
+            let currentColor = "#2196F3";
+            if (targetIdx === 'new') {
+                currentColor = (prop === 'text') ? document.getElementById('newTextColor').value : document.getElementById('newBgColor').value;
+            } else if (state.shiftMap[targetIdx]) {
+                currentColor = state.shiftMap[targetIdx][prop] || "#2196F3";
+            }
+
+            const hsv = hexToHsv(currentColor);
+            currentH = hsv.h;
+            currentS = hsv.s;
+            currentV = hsv.v;
+            update2DFromHsv();
 
             const rect = event.target.getBoundingClientRect();
-            picker.style.top = `${rect.bottom + window.scrollY + 5}px`;
-            picker.style.left = `${rect.left + window.scrollX - 50}px`;
+            let top = rect.bottom + window.scrollY + 5;
+            let left = rect.left + window.scrollX - 60;
+
+            if (left + 270 > window.innerWidth) left = window.innerWidth - 275;
+            if (left < 10) left = 10;
+
+            picker.style.top = `${top}px`;
+            picker.style.left = `${left}px`;
             picker.style.display = 'block';
         }
 
@@ -2897,76 +3357,30 @@
 
         function addShiftCode() {
             state.shiftMap.push({
-                name: document.getElementById('newShiftName').value, key: document.getElementById('newShiftKey').value,
-                pos: document.getElementById('newShiftPos').value || '通用', code: document.getElementById('newShiftCode').value,
-                textColor: document.getElementById('newTextColor').value, bgColor: document.getElementById('newBgColor').value,
+                name: document.getElementById('newShiftName').value,
+                key: document.getElementById('newShiftKey').value,
+                pos: document.getElementById('newShiftPos').value || '通用',
+                code: document.getElementById('newShiftCode').value,
+                fontSize: document.getElementById('newShiftFontSize').value || '13px',
+                bold: document.getElementById('newShiftBold').checked,
+                textColor: document.getElementById('newTextColor').value,
+                bgColor: document.getElementById('newBgColor').value,
                 cover: document.getElementById('newShiftCover').value || '',
-                ot: Number(document.getElementById('newShiftOT').value) || 0, al: Number(document.getElementById('newShiftAL').value) || 0, cl: Number(document.getElementById('newShiftCL').value) || 0,
-                autoAssign: document.getElementById('newShiftAutoAssign').checked // 👈 儲存自動排班設定
+                ot: Number(document.getElementById('newShiftOT').value) || 0,
+                al: Number(document.getElementById('newShiftAL').value) || 0,
+                cl: Number(document.getElementById('newShiftCL').value) || 0,
+                autoAssign: document.getElementById('newShiftAutoAssign').checked
             });
             ['newShiftName', 'newShiftKey', 'newShiftCode', 'newShiftCover'].forEach(id => document.getElementById(id).value = '');
             ['newShiftOT', 'newShiftAL', 'newShiftCL'].forEach(id => document.getElementById(id).value = '0');
             document.getElementById('newShiftAutoAssign').checked = true;
-            renderShiftCodes(); renderSchedule();
+            document.getElementById('newShiftBold').checked = true;
+            document.getElementById('newShiftFontSize').value = '13px';
+            renderShiftCodes();
+            renderSchedule();
         }
 
         function delShiftCode(idx) { state.shiftMap.splice(idx, 1); renderShiftCodes(); renderSchedule(); }
-        // ==========================================
-        // 💡 ☰ 原生拖曳排序邏輯 (支援人員名冊與班別設定)
-        // ==========================================
-        let draggedItem = null;
-
-        function handleDragStart(e, type, index) {
-            draggedItem = { type: type, index: index };
-            e.currentTarget.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', index);
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const tr = e.currentTarget;
-            if (!tr.classList.contains('dragging')) {
-                tr.classList.add('drag-over');
-            }
-        }
-
-        function handleDragLeave(e) {
-            e.currentTarget.classList.remove('drag-over');
-        }
-
-        function handleDrop(e, targetType, targetIndex) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('drag-over');
-
-            if (!draggedItem || draggedItem.type !== targetType) return;
-            const fromIndex = draggedItem.index;
-            const toIndex = targetIndex;
-
-            if (fromIndex === toIndex) return;
-
-            if (targetType === 'staff') {
-                syncStaffInputs();
-                const movedStaff = state.staff.splice(fromIndex, 1)[0];
-                state.staff.splice(toIndex, 0, movedStaff);
-                renderStaff();
-                renderSchedule();
-                showToast("↕️ 人員順序已更新");
-            } else if (targetType === 'shift') {
-                const movedShift = state.shiftMap.splice(fromIndex, 1)[0];
-                state.shiftMap.splice(toIndex, 0, movedShift);
-                renderShiftCodes();
-                renderSchedule();
-                showToast("↕️ 班別順序已更新");
-            }
-        }
-
-        function handleDragEnd(e) {
-            document.querySelectorAll('tr.dragging').forEach(el => el.classList.remove('dragging'));
-            document.querySelectorAll('tr.drag-over').forEach(el => el.classList.remove('drag-over'));
-            draggedItem = null;
-        }
 
         // 💡 調整班別順序 (direction: -1 為上移, 1 為下移)
         function moveShiftCode(idx, direction) {
@@ -3027,10 +3441,12 @@
         }
         function delManpower(idx) { state.manpower.splice(idx, 1); renderManpower(); renderSchedule(); }
 
+        let staffSortableInstance = null;
         function renderStaff() {
             const tbody = document.getElementById('staffBody');
+            if (!tbody) return;
             tbody.innerHTML = state.staff.map((emp, i) => `
-                <tr draggable="true" ondragstart="handleDragStart(event, 'staff', ${i})" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'staff', ${i})" ondragend="handleDragEnd(event)">
+                <tr data-index="${i}">
                     <td>
                         <span class="drag-handle" title="按住拖曳調整順序">☰</span>
                         <input class="edit-input" style="width:65px" value="${emp.id}" onchange="this.value=this.value.replace(/[^a-zA-Z0-9_-]/g, '').trim(); state.staff[${i}].id=this.value;">
@@ -3044,6 +3460,29 @@
                     <td><button class="btn btn-danger" onclick="delStaff(${i})">刪除</button></td>
                 </tr>
             `).join('');
+
+            if (staffSortableInstance) {
+                staffSortableInstance.destroy();
+            }
+            if (window.Sortable) {
+                staffSortableInstance = new Sortable(tbody, {
+                    handle: '.drag-handle',
+                    animation: 200,
+                    ghostClass: 'dragging',
+                    onEnd: function (evt) {
+                        const fromIndex = evt.oldIndex;
+                        const toIndex = evt.newIndex;
+                        if (fromIndex === toIndex) return;
+
+                        syncStaffInputs();
+                        const movedStaff = state.staff.splice(fromIndex, 1)[0];
+                        state.staff.splice(toIndex, 0, movedStaff);
+                        renderStaff();
+                        renderSchedule();
+                        showToast("↕️ 人員順序已更新");
+                    }
+                });
+            }
         }
         function addStaff() {
             const rawId = document.getElementById('newStaffId').value;
